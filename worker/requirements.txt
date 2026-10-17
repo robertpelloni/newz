@@ -1,0 +1,5 @@
+celery
+redis
+feedparser
+playwright
+httpx
