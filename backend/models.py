@@ -9,7 +9,7 @@ try:
 except ImportError:
     HAS_VECTOR = False
 
-from .database import Base
+from database import Base
 
 class Source(Base):
     __tablename__ = "sources"

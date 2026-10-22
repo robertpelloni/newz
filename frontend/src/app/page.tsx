@@ -1,6 +1,5 @@
-"use client";
-
-import { useEffect, useState } from "react";
+export const dynamic = "force-dynamic";
+import { Suspense } from "react";
 
 interface Topic {
   id: number;
@@ -14,23 +13,31 @@ interface GlobalSentiment {
   recent_entries: number;
 }
 
-export default function Home() {
-  const [topics, setTopics] = useState<Topic[]>([]);
-  const [sentiment, setSentiment] = useState<GlobalSentiment | null>(null);
+async function getTopics(): Promise<Topic[]> {
+  try {
+    const res = await fetch("http://localhost:8000/api/topics", { cache: 'no-store' });
+    if (!res.ok) throw new Error("Failed to fetch topics");
+    return res.json();
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
+}
 
-  useEffect(() => {
-    // Fetch topics
-    fetch("http://localhost:8000/api/topics")
-      .then((res) => res.json())
-      .then((data) => setTopics(data))
-      .catch((err) => console.error(err));
+async function getGlobalSentiment(): Promise<GlobalSentiment | null> {
+  try {
+    const res = await fetch("http://localhost:8000/api/sentiment/global", { cache: 'no-store' });
+    if (!res.ok) throw new Error("Failed to fetch sentiment");
+    return res.json();
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
 
-    // Fetch global sentiment
-    fetch("http://localhost:8000/api/sentiment/global")
-      .then((res) => res.json())
-      .then((data) => setSentiment(data))
-      .catch((err) => console.error(err));
-  }, []);
+export default async function Home() {
+  const topics = await getTopics();
+  const sentiment = await getGlobalSentiment();
 
   return (
     <main className="flex min-h-screen flex-col p-8 bg-gray-100">
@@ -46,7 +53,7 @@ export default function Home() {
           <h2 className="text-2xl font-semibold text-gray-800 border-b pb-2">Breaking Topics</h2>
 
           {topics.length === 0 ? (
-            <p className="text-gray-500">Loading topics...</p>
+            <p className="text-gray-500">No topics found or backend is offline.</p>
           ) : (
             topics.map(topic => (
               <div key={topic.id} className="bg-white rounded-lg shadow p-6">
@@ -72,7 +79,7 @@ export default function Home() {
                  <div className="text-sm text-gray-500">Based on {sentiment.recent_entries} recent entries</div>
                </div>
             ) : (
-              <p className="text-gray-500">Loading sentiment...</p>
+              <p className="text-gray-500">Sentiment data offline.</p>
             )}
           </div>
         </div>
