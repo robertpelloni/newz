@@ -3,3 +3,7 @@ redis
 feedparser
 playwright
 httpx
+sqlalchemy
+psycopg2-binary
+psycopg
+pgvector
