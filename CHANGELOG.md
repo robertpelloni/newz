@@ -2,6 +2,25 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.2.1] - 2026-10-24
+### Added
+- Real-time WebSocket feed endpoint `/api/ws/feed` and connection manager in `backend/main.py`.
+- Topic intelligence export endpoint `/api/topics/export` supporting CSV and JSON download.
+- Live WebSocket auto-refresh and animated notification toast in `frontend/src/app/page.tsx`.
+- Interactive CSV/JSON Export dropdown and OLED high-contrast mode toggle in dashboard header.
+- Automated unit tests covering topic exports (JSON/CSV) and WebSocket duplex communication in `backend/tests/test_api.py`.
+
+## [0.2.0] - 2026-10-24
+### Added
+- Dynamic SQLite database fallback (`sqlite:///./omnifeed.db`) if PostgreSQL is unavailable.
+- Expanded FastAPI surface: `/api/system/status`, `/api/sources`, `/api/topics` (with search and category filtering), `/api/topics/{id}`, `/api/sentiment/pulse`, `/api/actions/sync`, and `/api/system/shutdown`.
+- Unsupervised token-based Jaccard topic similarity clustering and lexicon polarity scoring in `worker/tasks.py`.
+- Consolidated single-page operations dashboard in Next.js 15 + Tailwind CSS v4 (`frontend/src/app/page.tsx`).
+- Deep-dive topic cluster exploration modal with source correlation and community social discussions.
+- System tray & server lifecycle controller in `scripts/system_tray.py` (`--status`, `--sync`, `--open`, `--stop`).
+- Unit and integration tests for API endpoints in `backend/tests/test_api.py`.
+- Core documentation governance files (`VISION.md`, `MEMORY.md`, `DEPLOY.md`, `IDEAS.md`, `ROADMAP.md`, `TODO.md`, `HANDOFF.md`, `VERSION.md`).
+
 ## [0.1.1] - 2026-10-17
 ### Added
 - Recreated missing documentation files.

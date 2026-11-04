@@ -1,9 +1,14 @@
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi.responses import Response, JSONResponse
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Optional, List, Set
 import os
 import signal
 import sys
+import asyncio
+import json
+import io
+import csv
 
 try:
     from backend import models, database, schemas
@@ -13,6 +18,30 @@ except ImportError:
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Omnifeed API", version="0.2.0")
+
+class ConnectionManager:
+    """Manages active WebSocket connections for live feed streaming."""
+    def __init__(self):
+        self.active_connections: Set[WebSocket] = set()
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.add(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.discard(websocket)
+
+    async def broadcast(self, message: dict):
+        dead_connections = set()
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception:
+                dead_connections.add(connection)
+        for dead in dead_connections:
+            self.active_connections.discard(dead)
+
+manager = ConnectionManager()
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,6 +65,23 @@ def get_db():
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Omnifeed API", "version": "0.2.0"}
+
+@app.websocket("/api/ws/feed")
+async def websocket_feed_endpoint(websocket: WebSocket):
+    """Real-time streaming channel for new topics, feed updates, and live alerts."""
+    await manager.connect(websocket)
+    try:
+        # Send initial handshake confirmation
+        await websocket.send_json({"event": "connected", "message": "Omnifeed live stream active"})
+        while True:
+            # Keep connection alive and accept incoming pings or queries
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_json({"event": "pong"})
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception:
+        manager.disconnect(websocket)
 
 @app.get("/api/system/status")
 def get_system_status(db: Session = Depends(get_db)):
@@ -101,6 +147,51 @@ def get_topics(
             "article_count": article_count,
         })
     return results
+
+@app.get("/api/topics/export")
+def export_topics(
+    format: str = Query("json", pattern="^(json|csv)$"),
+    category: Optional[str] = None,
+    q: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Export clustered intelligence topics to CSV or JSON formats for analysis."""
+    query = db.query(models.Topic)
+    if category and category.lower() != "all":
+        query = query.filter(models.Topic.category.ilike(f"%{category}%"))
+    if q:
+        query = query.filter(models.Topic.title.ilike(f"%{q}%") | models.Topic.summary.ilike(f"%{q}%"))
+
+    topics = query.order_by(models.Topic.last_updated.desc()).all()
+    data = []
+    for t in topics:
+        article_count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
+        data.append({
+            "id": t.id,
+            "title": t.title,
+            "category": t.category or "General",
+            "article_count": article_count,
+            "summary": t.summary or "",
+            "first_seen": t.first_seen.isoformat() if t.first_seen else "",
+            "last_updated": t.last_updated.isoformat() if t.last_updated else ""
+        })
+
+    if format == "csv":
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=["id", "title", "category", "article_count", "summary", "first_seen", "last_updated"])
+        writer.writeheader()
+        writer.writerows(data)
+        csv_content = output.getvalue()
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={"Content-Disposition": 'attachment; filename="omnifeed_topics.csv"'}
+        )
+
+    return JSONResponse(
+        content=data,
+        headers={"Content-Disposition": 'attachment; filename="omnifeed_topics.json"'}
+    )
 
 @app.get("/api/topics/{topic_id}")
 def get_topic(topic_id: int, db: Session = Depends(get_db)):
@@ -182,11 +273,16 @@ def get_sentiment_pulse(db: Session = Depends(get_db)):
     }
 
 @app.post("/api/actions/sync")
-def trigger_sync():
-    """Trigger background ingestion and clustering."""
+async def trigger_sync():
+    """Trigger background ingestion and clustering and broadcast notification."""
     try:
         from worker.tasks import run_pipeline_standalone
         count = run_pipeline_standalone()
+        await manager.broadcast({
+            "event": "sync_completed",
+            "synced_articles": count,
+            "message": f"Successfully ingested and clustered {count} items."
+        })
         return {"status": "success", "synced_articles": count}
     except Exception as e:
         return {"status": "error", "message": str(e)}

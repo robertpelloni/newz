@@ -7,11 +7,11 @@
 - [x] Build standalone system tray and server controller script (`scripts/system_tray.py`).
 - [x] Rebuild single-page ultra-dense dashboard in Next.js 15 with Tailwind CSS v4.
 - [x] Add detailed modal deep-dive for topic clusters.
-- [ ] Implement live WebSocket notifications on `/api/ws/feed` for streaming new topics.
-- [ ] Add bookmarking / topic export functionality to JSON/CSV directly from the UI.
+- [x] Implement live WebSocket notifications on `/api/ws/feed` for streaming new topics.
+- [x] Add bookmarking / topic export functionality to JSON/CSV directly from the UI.
 
 ## Polish & Optimization
 - [x] Provide tooltip guides on every metric and sentiment calculation.
 - [x] Configure Tailwind v4 PostCSS compilation.
-- [ ] Add dark / high-contrast OLED mode toggle in dashboard header.
+- [x] Add dark / high-contrast OLED mode toggle in dashboard header.
 - [ ] Implement pagination or virtualized scrolling for topic lists exceeding 100 entries.

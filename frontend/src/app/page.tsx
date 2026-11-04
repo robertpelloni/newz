@@ -66,13 +66,51 @@ export default function Dashboard() {
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
   const [topicDetail, setTopicDetail] = useState<TopicDetail | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [liveAlert, setLiveAlert] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [oledMode, setOledMode] = useState<boolean>(false);
+  const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
 
   const categories = ["All", "General", "Technology", "Business", "Politics", "Science", "Entertainment"];
 
-  // Fetch initial telemetry and pulse
+  // Fetch initial telemetry and pulse + live WebSocket connection
   useEffect(() => {
     fetchSystemData();
+
+    // Setup live WebSocket feed listener
+    let ws: WebSocket | null = null;
+    try {
+      const wsUrl = API_BASE.replace(/^http/, "ws") + "/api/ws/feed";
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => {
+        setWsConnected(true);
+      };
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.event === "sync_completed") {
+            setLiveAlert(payload.message || "New stories ingested & clustered!");
+            fetchSystemData();
+            fetchTopics();
+            setTimeout(() => setLiveAlert(null), 4000);
+          }
+        } catch (err) {
+          console.error("WS parse error:", err);
+        }
+      };
+      ws.onclose = () => {
+        setWsConnected(false);
+      };
+    } catch (e) {
+      console.warn("WebSocket connection failure:", e);
+    }
+
+    const interval = setInterval(fetchSystemData, 15000);
+    return () => {
+      clearInterval(interval);
+      if (ws) ws.close();
+    };
   }, []);
 
   // Fetch topics whenever category or search changes
@@ -156,15 +194,24 @@ export default function Dashboard() {
     }
   };
 
+  const handleExport = (format: "json" | "csv") => {
+    setShowExportMenu(false);
+    const url = new URL(`${API_BASE}/api/topics/export`);
+    url.searchParams.append("format", format);
+    if (activeCategory !== "All") url.searchParams.append("category", activeCategory);
+    if (searchQuery.trim()) url.searchParams.append("q", searchQuery.trim());
+    window.open(url.toString(), "_blank");
+  };
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className={`min-h-screen ${oledMode ? "bg-black text-neutral-100" : "bg-slate-950 text-slate-100"} flex flex-col font-sans transition-colors duration-200`}>
       {/* Top Universal Navbar */}
-      <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-6 py-3 flex items-center justify-between">
+      <header className={`border-b ${oledMode ? "border-neutral-800 bg-black/90" : "border-slate-800 bg-slate-900/90"} backdrop-blur sticky top-0 z-40 px-6 py-3 flex items-center justify-between`}>
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <span className="text-xl font-black tracking-wider text-cyan-400">OMNIFEED</span>
             <span className="text-xs uppercase px-2 py-0.5 font-bold bg-cyan-950 text-cyan-400 border border-cyan-800 rounded">
-              v{status?.version || "0.2.0"}
+              v{status?.version || "0.2.1"}
             </span>
           </div>
           <span className="text-xs text-slate-400 border-l border-slate-700 pl-4 hidden md:inline">
@@ -173,12 +220,49 @@ export default function Dashboard() {
         </div>
 
         {/* Global Controls & Status Indicators */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2 text-xs">
-            <span className={`inline-block w-2.5 h-2.5 rounded-full ${status ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
-            <span className="text-slate-300 font-medium">
-              {status ? "Online" : "Connecting..."}
+            <span className={`inline-block w-2.5 h-2.5 rounded-full ${wsConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+            <span className="text-slate-300 font-medium hidden sm:inline">
+              {wsConnected ? "Live WS" : "Polling"}
             </span>
+          </div>
+
+          {/* OLED Contrast Switch */}
+          <button
+            onClick={() => setOledMode(!oledMode)}
+            title="Toggle OLED High-Contrast Mode"
+            className={`px-2.5 py-1.5 text-xs font-semibold rounded border transition ${oledMode ? "bg-neutral-800 text-cyan-400 border-neutral-700" : "bg-slate-800 text-slate-300 border-slate-700 hover:text-white"}`}
+          >
+            {oledMode ? "☀️ Contrast" : "🌙 OLED"}
+          </button>
+
+          {/* Export Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              title="Export current filtered topics to CSV or JSON"
+              className="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded transition flex items-center space-x-1"
+            >
+              <span>📥 Export</span>
+              <span className="text-[10px]">▼</span>
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-1 w-36 bg-slate-900 border border-slate-700 rounded-lg shadow-xl py-1 z-50 text-xs">
+                <button
+                  onClick={() => handleExport("json")}
+                  className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-cyan-400 transition"
+                >
+                  Export as JSON
+                </button>
+                <button
+                  onClick={() => handleExport("csv")}
+                  className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-cyan-400 transition"
+                >
+                  Export as CSV
+                </button>
+              </div>
+            )}
           </div>
 
           <button
@@ -199,6 +283,13 @@ export default function Dashboard() {
           </button>
         </div>
       </header>
+
+      {/* Live Alert Toast */}
+      {liveAlert && (
+        <div className="bg-cyan-600 text-white text-xs font-semibold px-4 py-2 text-center shadow-lg transition-all animate-bounce">
+          ⚡ {liveAlert}
+        </div>
+      )}
 
       {/* Main Consolidated Dashboard Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">

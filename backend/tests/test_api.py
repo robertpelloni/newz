@@ -33,3 +33,26 @@ def test_sentiment_pulse():
     assert response.status_code == 200
     data = response.json()
     assert "overall_sentiment" in data
+
+def test_export_topics_json():
+    response = client.get("/api/topics/export?format=json")
+    assert response.status_code == 200
+    assert "application/json" in response.headers.get("content-type", "")
+    assert "attachment; filename=\"omnifeed_topics.json\"" in response.headers.get("content-disposition", "")
+    data = response.json()
+    assert isinstance(data, list)
+
+def test_export_topics_csv():
+    response = client.get("/api/topics/export?format=csv")
+    assert response.status_code == 200
+    assert "text/csv" in response.headers.get("content-type", "")
+    assert "attachment; filename=\"omnifeed_topics.csv\"" in response.headers.get("content-disposition", "")
+    assert "id,title,category,article_count" in response.text
+
+def test_websocket_feed():
+    with client.websocket_connect("/api/ws/feed") as websocket:
+        data = websocket.receive_json()
+        assert data["event"] == "connected"
+        websocket.send_text("ping")
+        pong = websocket.receive_json()
+        assert pong["event"] == "pong"
