@@ -1,0 +1,25 @@
+# Omnifeed (Newz) Long-Term Architecture & Structural Roadmap
+
+## Milestone 1: Zero-Dependency Core & High-Density UI (Completed - v0.2.0)
+- [x] Dual-mode database layer (automatic SQLite local fallback + PostgreSQL production support).
+- [x] Consolidated ultra-dense single-page dashboard architecture with category filtering and keyword search.
+- [x] Multi-source ingestion pipeline: Google News, Yahoo News, Hacker News, Reddit JSON, MSN News.
+- [x] Token-based Jaccard topic clustering and sentiment/controversy scoring engine.
+- [x] Cross-platform system tray & server lifecycle manager CLI (`scripts/system_tray.py`).
+- [x] Interactive deep-dive modal showing cross-source articles, social comments, and hashtag word clouds.
+- [x] Comprehensive documentation overhaul (VISION, MEMORY, DEPLOY, IDEAS, CHANGELOG, ROADMAP, TODO, HANDOFF).
+
+## Milestone 2: Intelligent Synthesis & Local LLM Integration (v0.3.0)
+- [ ] Direct Ollama / llama.cpp bridge in `worker/tasks.py` for automated offline bulleted summaries.
+- [ ] Topic evolution timeline tracking changes in story narratives over time.
+- [ ] Entity relationship extraction (people, organizations, locations).
+
+## Milestone 3: Social Firehose & Real-Time Streaming (v0.4.0)
+- [ ] Bluesky AT Protocol Jetstream firehose listener for micro-commentary.
+- [ ] Mastodon public timeline streaming.
+- [ ] WebSocket server pushing live incoming news clusters directly to the frontend without polling.
+
+## Milestone 4: Native Cross-Platform Distribution (v0.5.0)
+- [ ] Tauri v2 native desktop application wrapper embedding the Next.js bundle and Python backend.
+- [ ] Native system tray integration with OS notifications for breaking high-controversy topics.
+- [ ] Mobile-optimized PWA with offline caching.
