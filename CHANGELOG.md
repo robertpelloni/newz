@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.5.0] - 2026-10-24
+### Added
+- Native cross-platform desktop bundle support using Tauri v2 in `frontend/src-tauri/`.
+- Configured Tauri desktop window parameters, application identifiers, system tray integration, and custom protocol handlers.
+- Configured Next.js static HTML export mode (`output: 'export'`) in `frontend/next.config.ts`.
+- Added desktop workflow scripts (`tauri:dev`, `tauri:build`) in `frontend/package.json`.
+- Verified static export build artifacts in `frontend/out/`.
+
 ## [0.4.0] - 2026-10-24
 ### Added
 - Local LLM / Ollama bulleted summary generation bridge in `worker/tasks.py` with multi-source heuristic fallback.

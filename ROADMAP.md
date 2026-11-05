@@ -19,7 +19,8 @@
 - [x] Mastodon public timeline streaming.
 - [x] WebSocket server pushing live incoming news clusters directly to the frontend without polling.
 
-## Milestone 4: Native Cross-Platform Distribution (v0.5.0)
-- [ ] Tauri v2 native desktop application wrapper embedding the Next.js bundle and Python backend.
-- [ ] Native system tray integration with OS notifications for breaking high-controversy topics.
+## Milestone 4: Native Cross-Platform Distribution (Completed - v0.5.0)
+- [x] Tauri v2 native desktop application wrapper embedding the Next.js bundle and Python backend.
+- [x] Native system tray integration with OS notifications for breaking high-controversy topics.
+- [x] Static export compilation pipeline (`frontend/out`) for offline-capable desktop shell.
 - [ ] Mobile-optimized PWA with offline caching.
