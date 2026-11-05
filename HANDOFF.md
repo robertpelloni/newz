@@ -11,10 +11,13 @@
   - Real-time social firehose streaming (`/api/firehose/simulate`) for Bluesky AT Protocol Jetstream and Mastodon Fediverse timelines.
   - Local LLM / Ollama bulleted summary generation bridge (`generate_ai_summary`) and `/api/topics/{id}/summarize` endpoint.
   - Frontend operational dashboard with real-time WebSocket toast alerts, firehose streaming triggers, OLED contrast toggling, CSV/JSON topic exports, and deep-dive modal with AI synthesis refresh buttons.
-- **Milestone 4 Completion**:
+- **Milestone 4 Completion & Architectural Design**:
   - Configured Tauri v2 native desktop application wrapper in `frontend/src-tauri/` (`Cargo.toml`, `tauri.conf.json`, `src/main.rs`).
   - Next.js static export pipeline (`output: 'export'`) configured in `frontend/next.config.ts` delivering production assets to `frontend/out`.
   - Added desktop lifecycle npm scripts (`tauri:dev`, `tauri:build`) in `frontend/package.json`.
+  - PWA offline caching service worker implemented in `frontend/public/sw.js` and registered in `frontend/src/app/page.tsx` with `manifest.json`.
+  - Comprehensive data flow architecture diagram and ingestion mechanics specified in `README.md`, `VISION.md`, and `MEMORY.md`.
+  - Dynamic single-source versioning helper (`get_app_version()`) wired in `backend/main.py` directly loading from `VERSION.md`.
 
 ## 2. Current State of Running Processes
 - Backend: Uvicorn running on `0.0.0.0:8000` (live, passing all 13 automated API & model tests).

@@ -1,0 +1,16 @@
+{
+  "name": "Omnifeed Intelligence Hub",
+  "short_name": "Omnifeed",
+  "description": "Aggregated Cross-Source Intelligence Engine & Real-Time Sentiment Radar",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}
