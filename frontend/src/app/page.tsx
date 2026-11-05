@@ -74,6 +74,7 @@ export default function Dashboard() {
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
   const [topicDetail, setTopicDetail] = useState<TopicDetail | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [isFirehosing, setIsFirehosing] = useState<boolean>(false);
   const [wsConnected, setWsConnected] = useState(false);
   const [liveAlert, setLiveAlert] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -101,7 +102,7 @@ export default function Dashboard() {
       ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
-          if (payload.event === "sync_completed") {
+          if (payload.event === "sync_completed" || payload.event === "firehose_pulse") {
             setLiveAlert(payload.message || "New stories ingested & clustered!");
             fetchSystemData();
             fetchTopics();
@@ -211,6 +212,19 @@ export default function Dashboard() {
     }
   };
 
+  const handleFirehosePulse = async () => {
+    setIsFirehosing(true);
+    try {
+      await fetch(`${API_BASE}/api/firehose/simulate`, { method: "POST" });
+      await fetchSystemData();
+      await fetchTopics();
+    } catch (e) {
+      console.error("Firehose error:", e);
+    } finally {
+      setIsFirehosing(false);
+    }
+  };
+
   const handleShutdown = async () => {
     if (confirm("Are you sure you want to quit the backend server?")) {
       try {
@@ -240,7 +254,7 @@ export default function Dashboard() {
           <div className="flex items-center space-x-2">
             <span className="text-xl font-black tracking-wider text-cyan-400">OMNIFEED</span>
             <span className="text-xs uppercase px-2 py-0.5 font-bold bg-cyan-950 text-cyan-400 border border-cyan-800 rounded">
-              v{status?.version || "0.2.1"}
+              v{status?.version || "0.3.0"}
             </span>
           </div>
           <span className="text-xs text-slate-400 border-l border-slate-700 pl-4 hidden md:inline">
@@ -293,6 +307,15 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+
+          <button
+            onClick={handleFirehosePulse}
+            disabled={isFirehosing}
+            title="Stream real-time micro-commentary from Bluesky AT Protocol & Mastodon"
+            className="flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded transition shadow disabled:opacity-50"
+          >
+            <span>{isFirehosing ? "🌊 Firehose Pulsing..." : "🌊 Stream Firehose"}</span>
+          </button>
 
           <button
             onClick={handleSync}

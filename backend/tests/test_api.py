@@ -84,3 +84,10 @@ def test_topic_detail_entities_and_timeline():
         assert "timeline" in detail["topic"]
         assert isinstance(detail["topic"]["entities"], list)
         assert isinstance(detail["topic"]["timeline"], list)
+
+def test_social_firehose_ingest_and_broadcast():
+    response = client.post("/api/firehose/simulate")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert "ingested_events" in data

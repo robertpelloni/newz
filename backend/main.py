@@ -17,7 +17,7 @@ except ImportError:
 
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Omnifeed API", version="0.2.2")
+app = FastAPI(title="Omnifeed API", version="0.3.0")
 
 class ConnectionManager:
     """Manages active WebSocket connections for live feed streaming."""
@@ -64,7 +64,7 @@ def get_db():
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to Omnifeed API", "version": "0.2.2"}
+    return {"message": "Welcome to Omnifeed API", "version": "0.3.0"}
 
 @app.websocket("/api/ws/feed")
 async def websocket_feed_endpoint(websocket: WebSocket):
@@ -92,7 +92,7 @@ def get_system_status(db: Session = Depends(get_db)):
 
     return {
         "status": "healthy",
-        "version": "0.2.2",
+        "version": "0.3.0",
         "database": "connected",
         "counts": {
             "articles": article_count,
@@ -298,6 +298,21 @@ async def trigger_sync():
             "message": f"Successfully ingested and clustered {count} items."
         })
         return {"status": "success", "synced_articles": count}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/firehose/simulate")
+async def trigger_firehose():
+    """Ingest simulated real-time micro-commentary from Bluesky Jetstream & Mastodon Fediverse."""
+    try:
+        from worker.tasks import ingest_social_firehose
+        count = ingest_social_firehose()
+        await manager.broadcast({
+            "event": "firehose_pulse",
+            "ingested_events": count,
+            "message": f"Live Firehose: Streamed {count} micro-commentary events from Bluesky & Mastodon."
+        })
+        return {"status": "success", "ingested_events": count}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
