@@ -9,7 +9,10 @@ try:
 except ImportError:
     HAS_VECTOR = False
 
-from database import Base
+try:
+    from backend.database import Base
+except ImportError:
+    from database import Base
 
 class Source(Base):
     __tablename__ = "sources"
@@ -43,6 +46,8 @@ class Topic(Base):
         embedding_vector = Column(JSON)
     first_seen = Column(DateTime, default=datetime.datetime.utcnow)
     last_updated = Column(DateTime, default=datetime.datetime.utcnow)
+    entities_json = Column(JSON, default=list) # Extracted people, orgs, locations
+    timeline_json = Column(JSON, default=list) # Narrative chronological milestones
 
 class ArticleTopic(Base):
     __tablename__ = "article_topics"

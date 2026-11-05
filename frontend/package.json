@@ -6,10 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "next lint",
+    "tauri:dev": "cargo run --manifest-path src-tauri/Cargo.toml",
+    "tauri:build": "cargo build --release --manifest-path src-tauri/Cargo.toml"
   },
   "dependencies": {
+    "@tailwindcss/postcss": "^4.3.4",
     "next": "^15.1.7",
+    "postcss": "^8.5.32",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
