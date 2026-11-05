@@ -17,7 +17,7 @@ except ImportError:
 
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Omnifeed API", version="0.2.0")
+app = FastAPI(title="Omnifeed API", version="0.2.2")
 
 class ConnectionManager:
     """Manages active WebSocket connections for live feed streaming."""
@@ -64,7 +64,7 @@ def get_db():
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to Omnifeed API", "version": "0.2.0"}
+    return {"message": "Welcome to Omnifeed API", "version": "0.2.2"}
 
 @app.websocket("/api/ws/feed")
 async def websocket_feed_endpoint(websocket: WebSocket):
@@ -92,7 +92,7 @@ def get_system_status(db: Session = Depends(get_db)):
 
     return {
         "status": "healthy",
-        "version": "0.2.0",
+        "version": "0.2.2",
         "database": "connected",
         "counts": {
             "articles": article_count,
@@ -119,25 +119,30 @@ def get_sources(db: Session = Depends(get_db)):
 
 @app.get("/api/topics")
 def get_topics(
-    skip: int = 0,
-    limit: int = 50,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(12, ge=1, le=100),
     category: Optional[str] = None,
     q: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
+    """Retrieve paginated topics with search and category filtering."""
     query = db.query(models.Topic)
     if category and category.lower() != "all":
         query = query.filter(models.Topic.category.ilike(f"%{category}%"))
     if q:
         query = query.filter(models.Topic.title.ilike(f"%{q}%") | models.Topic.summary.ilike(f"%{q}%"))
 
-    topics = query.order_by(models.Topic.last_updated.desc()).offset(skip).limit(limit).all()
+    total = query.count()
+    skip = (page - 1) * page_size
+    topics = query.order_by(models.Topic.last_updated.desc()).offset(skip).limit(page_size).all()
+
+    total_pages = max(1, (total + page_size - 1) // page_size)
 
     # Eagerly prepare response
-    results = []
+    items = []
     for t in topics:
         article_count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
-        results.append({
+        items.append({
             "id": t.id,
             "title": t.title,
             "summary": t.summary,
@@ -146,7 +151,14 @@ def get_topics(
             "last_updated": t.last_updated.isoformat() if t.last_updated else None,
             "article_count": article_count,
         })
-    return results
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages
+    }
 
 @app.get("/api/topics/export")
 def export_topics(

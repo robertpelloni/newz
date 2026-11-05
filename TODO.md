@@ -14,4 +14,4 @@
 - [x] Provide tooltip guides on every metric and sentiment calculation.
 - [x] Configure Tailwind v4 PostCSS compilation.
 - [x] Add dark / high-contrast OLED mode toggle in dashboard header.
-- [ ] Implement pagination or virtualized scrolling for topic lists exceeding 100 entries.
+- [x] Implement pagination or virtualized scrolling for topic lists exceeding 100 entries.

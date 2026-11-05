@@ -25,8 +25,20 @@ def test_get_sources():
 def test_get_topics():
     response = client.get("/api/topics")
     assert response.status_code == 200
-    topics = response.json()
-    assert isinstance(topics, list)
+    data = response.json()
+    assert "items" in data
+    assert "total" in data
+    assert "page" in data
+    assert "total_pages" in data
+    assert isinstance(data["items"], list)
+
+def test_get_topics_pagination():
+    response = client.get("/api/topics?page=1&page_size=5")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["page"] == 1
+    assert data["page_size"] == 5
+    assert len(data["items"]) <= 5
 
 def test_sentiment_pulse():
     response = client.get("/api/sentiment/pulse")

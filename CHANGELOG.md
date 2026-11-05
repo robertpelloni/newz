@@ -2,6 +2,13 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.2.2] - 2026-10-24
+### Added
+- Server-side pagination metadata in `/api/topics` (`page`, `page_size`, `total`, `total_pages`).
+- Interactive pagination navigation controls in the frontend dashboard (Next, Previous, and numbered page selectors).
+- Automated unit test suite additions for topic pagination validation (`test_get_topics_pagination`).
+- Aligned internal version identifiers across backend telemetry to v0.2.2.
+
 ## [0.2.1] - 2026-10-24
 ### Added
 - Real-time WebSocket feed endpoint `/api/ws/feed` and connection manager in `backend/main.py`.

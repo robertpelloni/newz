@@ -71,6 +71,10 @@ export default function Dashboard() {
   const [loading, setLoading] = useState<boolean>(true);
   const [oledMode, setOledMode] = useState<boolean>(false);
   const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(9);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalTopics, setTotalTopics] = useState<number>(0);
 
   const categories = ["All", "General", "Technology", "Business", "Politics", "Science", "Entertainment"];
 
@@ -113,10 +117,15 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Fetch topics whenever category or search changes
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [activeCategory, searchQuery]);
+
+  // Fetch topics whenever category, search, or pagination changes
   useEffect(() => {
     fetchTopics();
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, searchQuery, page, pageSize]);
 
   // Fetch deep-dive modal
   useEffect(() => {
@@ -144,12 +153,24 @@ export default function Dashboard() {
     setLoading(true);
     try {
       const url = new URL(`${API_BASE}/api/topics`);
+      url.searchParams.append("page", page.toString());
+      url.searchParams.append("page_size", pageSize.toString());
       if (activeCategory !== "All") url.searchParams.append("category", activeCategory);
       if (searchQuery.trim()) url.searchParams.append("q", searchQuery.trim());
 
       const res = await fetch(url.toString());
       if (res.ok) {
-        setTopics(await res.json());
+        const data = await res.json();
+        // Support both paginated object and legacy array format
+        if (data.items) {
+          setTopics(data.items);
+          setTotalTopics(data.total);
+          setTotalPages(data.total_pages);
+        } else {
+          setTopics(data);
+          setTotalTopics(data.length);
+          setTotalPages(1);
+        }
       }
     } catch (e) {
       console.error("Error fetching topics:", e);
@@ -370,13 +391,36 @@ export default function Dashboard() {
 
         {/* Dynamic Clustered Topics Grid */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-base font-bold text-slate-200 flex items-center space-x-2">
               <span>Dynamic Clustered Topics</span>
               <span className="text-xs font-normal text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
-                {topics.length} clusters
+                {totalTopics} total
               </span>
             </h2>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center space-x-2 text-xs">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded disabled:opacity-30 disabled:pointer-events-none transition"
+                >
+                  ◀ Prev
+                </button>
+                <span className="text-slate-400 px-1">
+                  Page <strong className="text-slate-200">{page}</strong> of <strong className="text-slate-200">{totalPages}</strong>
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded disabled:opacity-30 disabled:pointer-events-none transition"
+                >
+                  Next ▶
+                </button>
+              </div>
+            )}
           </div>
 
           {loading ? (
@@ -420,6 +464,35 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Bottom Pagination Bar */}
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center space-x-2 pt-4 text-xs">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-cyan-600 text-slate-300 rounded-lg disabled:opacity-30 disabled:pointer-events-none transition"
+              >
+                ◀ Previous
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
+                <button
+                  key={num}
+                  onClick={() => setPage(num)}
+                  className={`w-8 h-8 rounded-lg font-medium transition ${page === num ? "bg-cyan-600 text-white" : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"}`}
+                >
+                  {num}
+                </button>
+              ))}
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-cyan-600 text-slate-300 rounded-lg disabled:opacity-30 disabled:pointer-events-none transition"
+              >
+                Next ▶
+              </button>
             </div>
           )}
         </section>
