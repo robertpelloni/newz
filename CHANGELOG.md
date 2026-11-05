@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.5.3] - 2026-10-24
+### Added
+- Dynamic single-source versioning helper (`get_app_version()`) in `backend/main.py` directly loading from `VERSION.md`.
+- Synchronized API metadata, root route, and telemetry responses to `VERSION.md`.
+- All 13 unit and integration tests passing.
+
 ## [0.5.2] - 2026-10-24
 ### Added
 - Comprehensive multi-source and social data flow architecture design diagram in `README.md`.

@@ -17,7 +17,20 @@ except ImportError:
 
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Omnifeed API", version="0.3.0")
+def get_app_version() -> str:
+    """Dynamically read version string from root VERSION.md."""
+    try:
+        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        version_path = os.path.join(root_dir, "VERSION.md")
+        if os.path.exists(version_path):
+            with open(version_path, "r", encoding="utf-8") as f:
+                return f.read().strip()
+    except Exception:
+        pass
+    return "0.5.2"
+
+APP_VERSION = get_app_version()
+app = FastAPI(title="Omnifeed API", version=APP_VERSION)
 
 class ConnectionManager:
     """Manages active WebSocket connections for live feed streaming."""
@@ -64,7 +77,7 @@ def get_db():
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to Omnifeed API", "version": "0.3.0"}
+    return {"message": "Welcome to Omnifeed API", "version": get_app_version()}
 
 @app.websocket("/api/ws/feed")
 async def websocket_feed_endpoint(websocket: WebSocket):
@@ -92,7 +105,7 @@ def get_system_status(db: Session = Depends(get_db)):
 
     return {
         "status": "healthy",
-        "version": "0.3.0",
+        "version": get_app_version(),
         "database": "connected",
         "counts": {
             "articles": article_count,
