@@ -2,6 +2,16 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.3.0] - 2026-10-24
+### Added
+- Unsupervised entity extraction in worker pipeline (`worker/tasks.py`) extracting proper nouns and high-value entities from correlated articles.
+- Chronological narrative evolution timeline marker generation, linking milestone events across multiple news wire sources.
+- Persisted `entities_json` and `timeline_json` fields to `Topic` model in `backend/models.py`.
+- Topic details API endpoint `/api/topics/{id}` serialization of entity tags and chronological narrative evolution milestones.
+- Interactive deep-dive modal UI updates in `frontend/src/app/page.tsx` displaying "Key Extracted Entities" badges and a visual "Narrative Evolution Timeline".
+- Automated unit test `test_topic_detail_entities_and_timeline` in `backend/tests/test_api.py`.
+- Updated database migrations and local SQLite schema backfills.
+
 ## [0.2.2] - 2026-10-24
 ### Added
 - Server-side pagination metadata in `/api/topics` (`page`, `page_size`, `total`, `total_pages`).

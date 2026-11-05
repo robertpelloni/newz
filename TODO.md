@@ -9,9 +9,13 @@
 - [x] Add detailed modal deep-dive for topic clusters.
 - [x] Implement live WebSocket notifications on `/api/ws/feed` for streaming new topics.
 - [x] Add bookmarking / topic export functionality to JSON/CSV directly from the UI.
+- [x] Extract named entities (people, organizations, concepts) and chronological timeline evolution markers into `Topic` model.
+- [x] Surface extracted entities and narrative timeline in the topic cluster modal deep-dive.
 
 ## Polish & Optimization
 - [x] Provide tooltip guides on every metric and sentiment calculation.
 - [x] Configure Tailwind v4 PostCSS compilation.
 - [x] Add dark / high-contrast OLED mode toggle in dashboard header.
 - [x] Implement pagination or virtualized scrolling for topic lists exceeding 100 entries.
+- [ ] Connect direct local LLM (Ollama) summary generator.
+- [ ] Integrate Bluesky AT Protocol firehose subscriber.

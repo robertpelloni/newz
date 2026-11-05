@@ -44,6 +44,20 @@ def calculate_jaccard(tokens1, tokens2):
     union = len(tokens1.union(tokens2))
     return float(intersection) / union if union > 0 else 0.0
 
+def extract_named_entities(text: str):
+    """Extract capitalized multi-word phrases and key proper nouns as entities."""
+    # Find consecutive capitalized words (e.g. 'Donald Trump', 'Supreme Court', 'Silicon Valley')
+    pattern = r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b'
+    candidates = re.findall(pattern, text)
+    filtered = []
+    for c in candidates:
+        words = c.lower().split()
+        if len(c) > 2 and not all(w in STOP_WORDS for w in words):
+            filtered.append(c)
+    # Deduplicate while preserving frequent appearances
+    counts = Counter(filtered)
+    return [name for name, _ in counts.most_common(8)]
+
 def simple_sentiment_analysis(text: str):
     """Rule-based polarity and controversy scoring."""
     positive_words = {"surges", "breakthrough", "gain", "peace", "record", "growth", "win", "wins", "celebrates", "success", "innovative", "historic", "agreement", "hope", "leads", "boost", "optimism"}
@@ -168,6 +182,14 @@ def cluster_and_persist(db, raw_articles, source_name, source_type):
                 matched_topic = topic
                 break
 
+        entities = extract_named_entities(art.title + " " + (art.raw_content or ""))
+        timeline_marker = {
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "headline": art.title,
+            "source": source_name,
+            "url": art.url
+        }
+
         if not matched_topic:
             category = categorize_title(art.title)
             summary = f"Synthesized coverage across news sources regarding {art.title[:120]}..."
@@ -176,7 +198,9 @@ def cluster_and_persist(db, raw_articles, source_name, source_type):
                 summary=summary,
                 category=category,
                 first_seen=datetime.datetime.utcnow(),
-                last_updated=datetime.datetime.utcnow()
+                last_updated=datetime.datetime.utcnow(),
+                entities_json=entities,
+                timeline_json=[timeline_marker]
             )
             db.add(matched_topic)
             db.commit()
@@ -184,6 +208,16 @@ def cluster_and_persist(db, raw_articles, source_name, source_type):
             existing_topics.append(matched_topic)
         else:
             matched_topic.last_updated = datetime.datetime.utcnow()
+            # Merge entities
+            current_ents = set(matched_topic.entities_json or [])
+            current_ents.update(entities)
+            matched_topic.entities_json = list(current_ents)[:12]
+
+            # Append timeline marker if not already present
+            timeline = list(matched_topic.timeline_json or [])
+            if not any(m.get("headline") == art.title for m in timeline):
+                timeline.append(timeline_marker)
+            matched_topic.timeline_json = timeline
             db.commit()
 
         # Link Article to Topic

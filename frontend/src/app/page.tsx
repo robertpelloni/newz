@@ -32,7 +32,15 @@ interface SentimentPulse {
 }
 
 interface TopicDetail {
-  topic: Topic;
+  topic: Topic & {
+    entities?: string[];
+    timeline?: Array<{
+      timestamp: string;
+      headline: string;
+      source: string;
+      url: string;
+    }>;
+  };
   articles: Array<{
     id: number;
     title: string;
@@ -522,6 +530,48 @@ export default function Dashboard() {
                     {topicDetail.topic.summary}
                   </p>
                 </div>
+
+                {/* Extracted Named Entities */}
+                {topicDetail.topic.entities && topicDetail.topic.entities.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">
+                      Key Extracted Entities
+                    </h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {topicDetail.topic.entities.map((ent, idx) => (
+                        <span
+                          key={idx}
+                          className="bg-slate-800 text-cyan-300 border border-slate-700 px-2 py-0.5 rounded text-xs font-medium"
+                        >
+                          👤 {ent}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Narrative Evolution Timeline */}
+                {topicDetail.topic.timeline && topicDetail.topic.timeline.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">
+                      Narrative Evolution Timeline
+                    </h4>
+                    <div className="relative border-l border-cyan-800/60 ml-2 pl-4 space-y-3">
+                      {topicDetail.topic.timeline.map((event, idx) => (
+                        <div key={idx} className="relative group">
+                          <div className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full bg-cyan-400 group-hover:scale-125 transition" />
+                          <div className="text-xs">
+                            <span className="text-cyan-400 font-semibold">{event.source}</span>
+                            <span className="text-slate-500 ml-2">
+                              {event.timestamp ? new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recently"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-200 mt-0.5">{event.headline}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Sources List */}
                 <div className="space-y-3">

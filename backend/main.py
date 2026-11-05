@@ -223,6 +223,8 @@ def get_topic(topic_id: int, db: Session = Depends(get_db)):
             "category": topic.category,
             "first_seen": topic.first_seen.isoformat() if topic.first_seen else None,
             "last_updated": topic.last_updated.isoformat() if topic.last_updated else None,
+            "entities": topic.entities_json or [],
+            "timeline": topic.timeline_json or [],
         },
         "articles": [
             {

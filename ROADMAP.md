@@ -10,9 +10,9 @@
 - [x] Comprehensive documentation overhaul (VISION, MEMORY, DEPLOY, IDEAS, CHANGELOG, ROADMAP, TODO, HANDOFF).
 
 ## Milestone 2: Intelligent Synthesis & Local LLM Integration (v0.3.0)
+- [x] Topic evolution timeline tracking changes in story narratives over time.
+- [x] Entity relationship extraction (people, organizations, locations).
 - [ ] Direct Ollama / llama.cpp bridge in `worker/tasks.py` for automated offline bulleted summaries.
-- [ ] Topic evolution timeline tracking changes in story narratives over time.
-- [ ] Entity relationship extraction (people, organizations, locations).
 
 ## Milestone 3: Social Firehose & Real-Time Streaming (v0.4.0)
 - [ ] Bluesky AT Protocol Jetstream firehose listener for micro-commentary.

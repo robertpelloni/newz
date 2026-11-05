@@ -68,3 +68,19 @@ def test_websocket_feed():
         websocket.send_text("ping")
         pong = websocket.receive_json()
         assert pong["event"] == "pong"
+
+def test_topic_detail_entities_and_timeline():
+    # Fetch first topic
+    topics_res = client.get("/api/topics")
+    assert topics_res.status_code == 200
+    items = topics_res.json()["items"]
+    if items:
+        topic_id = items[0]["id"]
+        detail_res = client.get(f"/api/topics/{topic_id}")
+        assert detail_res.status_code == 200
+        detail = detail_res.json()
+        assert "topic" in detail
+        assert "entities" in detail["topic"]
+        assert "timeline" in detail["topic"]
+        assert isinstance(detail["topic"]["entities"], list)
+        assert isinstance(detail["topic"]["timeline"], list)
