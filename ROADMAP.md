@@ -24,3 +24,4 @@
 - [x] Native system tray integration with OS notifications for breaking high-controversy topics.
 - [x] Static export compilation pipeline (`frontend/out`) for offline-capable desktop shell.
 - [x] Mobile-optimized PWA with offline caching (`manifest.json` and `sw.js`).
+- [x] Data flow architecture specification and multi-source pipeline design.

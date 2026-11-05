@@ -22,3 +22,4 @@
 - [x] Implement Tauri v2 desktop application wrapper configuration (`frontend/src-tauri/`).
 - [x] Add Next.js static build export configuration for desktop bundling.
 - [x] Implement mobile PWA service worker with offline cache fallback (`manifest.json` and `sw.js`).
+- [x] Complete end-to-end data flow architecture diagram and ingestion documentation in README.md.

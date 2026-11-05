@@ -2,6 +2,13 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.5.2] - 2026-10-24
+### Added
+- Comprehensive multi-source and social data flow architecture design diagram in `README.md`.
+- Formal mathematical Jaccard similarity and narrative evolution clustering specifications.
+- Synchronized architecture tenets in `VISION.md` and design observations in `MEMORY.md`.
+- All backend unit and integration tests passing (13/13).
+
 ## [0.5.1] - 2026-10-24
 ### Added
 - Progressive Web App (PWA) manifest in `frontend/public/manifest.json`.
