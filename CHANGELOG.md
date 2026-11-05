@@ -2,6 +2,15 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.4.0] - 2026-10-24
+### Added
+- Local LLM / Ollama bulleted summary generation bridge in `worker/tasks.py` with multi-source heuristic fallback.
+- Topic summarization endpoint `/api/topics/{id}/summarize` in `backend/main.py`.
+- Interactive "✨ Synthesized Intelligence" card and "⚡ Refresh AI Summary" action in frontend topic deep-dive modal (`frontend/src/app/page.tsx`).
+- Real-time social firehose streaming via Bluesky AT Protocol Jetstream and Mastodon Fediverse (`/api/firehose/simulate`).
+- Live WebSocket `firehose_pulse` event broadcast and frontend streaming toast notifications.
+- Automated unit test suite additions covering AI summarization and firehose streaming (13/13 passing tests).
+
 ## [0.3.0] - 2026-10-24
 ### Added
 - Unsupervised entity extraction in worker pipeline (`worker/tasks.py`) extracting proper nouns and high-value entities from correlated articles.

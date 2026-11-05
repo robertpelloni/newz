@@ -17,5 +17,6 @@
 - [x] Configure Tailwind v4 PostCSS compilation.
 - [x] Add dark / high-contrast OLED mode toggle in dashboard header.
 - [x] Implement pagination or virtualized scrolling for topic lists exceeding 100 entries.
-- [ ] Connect direct local LLM (Ollama) summary generator.
-- [ ] Integrate Bluesky AT Protocol firehose subscriber.
+- [x] Connect direct local LLM (Ollama) summary generator.
+- [x] Integrate Bluesky AT Protocol firehose subscriber.
+- [ ] Implement Tauri v2 desktop application wrapper configuration.

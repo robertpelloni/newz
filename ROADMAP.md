@@ -9,15 +9,15 @@
 - [x] Interactive deep-dive modal showing cross-source articles, social comments, and hashtag word clouds.
 - [x] Comprehensive documentation overhaul (VISION, MEMORY, DEPLOY, IDEAS, CHANGELOG, ROADMAP, TODO, HANDOFF).
 
-## Milestone 2: Intelligent Synthesis & Local LLM Integration (v0.3.0)
+## Milestone 2: Intelligent Synthesis & Local LLM Integration (Completed - v0.3.0)
 - [x] Topic evolution timeline tracking changes in story narratives over time.
 - [x] Entity relationship extraction (people, organizations, locations).
-- [ ] Direct Ollama / llama.cpp bridge in `worker/tasks.py` for automated offline bulleted summaries.
+- [x] Direct Ollama / llama.cpp bridge in `worker/tasks.py` for automated offline bulleted summaries.
 
-## Milestone 3: Social Firehose & Real-Time Streaming (v0.4.0)
-- [ ] Bluesky AT Protocol Jetstream firehose listener for micro-commentary.
-- [ ] Mastodon public timeline streaming.
-- [ ] WebSocket server pushing live incoming news clusters directly to the frontend without polling.
+## Milestone 3: Social Firehose & Real-Time Streaming (Completed - v0.4.0)
+- [x] Bluesky AT Protocol Jetstream firehose listener for micro-commentary.
+- [x] Mastodon public timeline streaming.
+- [x] WebSocket server pushing live incoming news clusters directly to the frontend without polling.
 
 ## Milestone 4: Native Cross-Platform Distribution (v0.5.0)
 - [ ] Tauri v2 native desktop application wrapper embedding the Next.js bundle and Python backend.

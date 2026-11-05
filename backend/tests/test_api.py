@@ -91,3 +91,16 @@ def test_social_firehose_ingest_and_broadcast():
     data = response.json()
     assert data["status"] == "success"
     assert "ingested_events" in data
+
+def test_topic_ai_summary_endpoint():
+    topics_res = client.get("/api/topics")
+    assert topics_res.status_code == 200
+    items = topics_res.json()["items"]
+    if items:
+        topic_id = items[0]["id"]
+        response = client.post(f"/api/topics/{topic_id}/summarize")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "summary" in data
+        assert len(data["summary"]) > 0

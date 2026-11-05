@@ -74,6 +74,7 @@ export default function Dashboard() {
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
   const [topicDetail, setTopicDetail] = useState<TopicDetail | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [isSummarizing, setIsSummarizing] = useState<boolean>(false);
   const [isFirehosing, setIsFirehosing] = useState<boolean>(false);
   const [wsConnected, setWsConnected] = useState(false);
   const [liveAlert, setLiveAlert] = useState<string | null>(null);
@@ -234,6 +235,30 @@ export default function Dashboard() {
       } catch (e) {
         console.error("Shutdown error:", e);
       }
+    }
+  };
+
+  const handleSummarize = async () => {
+    if (!selectedTopicId) return;
+    setIsSummarizing(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/topics/${selectedTopicId}/summarize`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        if (topicDetail) {
+          setTopicDetail({
+            ...topicDetail,
+            topic: {
+              ...topicDetail.topic,
+              summary: data.summary
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Summarization error:", e);
+    } finally {
+      setIsSummarizing(false);
     }
   };
 
@@ -549,9 +574,23 @@ export default function Dashboard() {
                   <h2 className="text-lg font-bold text-slate-100">
                     {topicDetail.topic.title}
                   </h2>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    {topicDetail.topic.summary}
-                  </p>
+                  <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-400">
+                        ✨ Synthesized Intelligence
+                      </span>
+                      <button
+                        onClick={handleSummarize}
+                        disabled={isSummarizing}
+                        className="px-2 py-0.5 text-[10px] font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800 hover:bg-cyan-900 rounded transition disabled:opacity-50"
+                      >
+                        {isSummarizing ? "Synthesizing..." : "⚡ Refresh AI Summary"}
+                      </button>
+                    </div>
+                    <div className="text-xs text-slate-300 leading-relaxed whitespace-pre-line font-mono">
+                      {topicDetail.topic.summary}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Extracted Named Entities */}
