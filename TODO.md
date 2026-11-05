@@ -21,4 +21,4 @@
 - [x] Integrate Bluesky AT Protocol firehose subscriber.
 - [x] Implement Tauri v2 desktop application wrapper configuration (`frontend/src-tauri/`).
 - [x] Add Next.js static build export configuration for desktop bundling.
-- [ ] Implement mobile PWA service worker with offline cache fallback.
+- [x] Implement mobile PWA service worker with offline cache fallback (`manifest.json` and `sw.js`).

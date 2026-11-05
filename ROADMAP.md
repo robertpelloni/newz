@@ -23,4 +23,4 @@
 - [x] Tauri v2 native desktop application wrapper embedding the Next.js bundle and Python backend.
 - [x] Native system tray integration with OS notifications for breaking high-controversy topics.
 - [x] Static export compilation pipeline (`frontend/out`) for offline-capable desktop shell.
-- [ ] Mobile-optimized PWA with offline caching.
+- [x] Mobile-optimized PWA with offline caching (`manifest.json` and `sw.js`).

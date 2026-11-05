@@ -15,6 +15,7 @@
   - Configured Tauri v2 native desktop application wrapper in `frontend/src-tauri/` (`Cargo.toml`, `tauri.conf.json`, `src/main.rs`).
   - Next.js static export pipeline (`output: 'export'`) configured in `frontend/next.config.ts` delivering production assets to `frontend/out`.
   - Added desktop lifecycle npm scripts (`tauri:dev`, `tauri:build`) in `frontend/package.json`.
+  - PWA offline caching service worker implemented in `frontend/public/sw.js` and registered in `frontend/src/app/page.tsx` with `manifest.json`.
 
 ## 2. Current State of Running Processes
 - Backend: Uvicorn running on `0.0.0.0:8000` (live, passing all 13 automated API & model tests).
