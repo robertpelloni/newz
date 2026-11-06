@@ -79,6 +79,7 @@ export default function Dashboard() {
   const [isSummarizing, setIsSummarizing] = useState<boolean>(false);
   const [isFirehosing, setIsFirehosing] = useState<boolean>(false);
   const [wsConnected, setWsConnected] = useState(false);
+  const [wsReconnectAttempts, setWsReconnectAttempts] = useState<number>(0);
   const [liveAlert, setLiveAlert] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [oledMode, setOledMode] = useState<boolean>(false);
@@ -132,41 +133,72 @@ export default function Dashboard() {
     });
   };
 
-  // Fetch initial telemetry and pulse + live WebSocket connection
+  // Fetch initial telemetry and pulse + resilient live WebSocket connection with exponential backoff
   useEffect(() => {
     fetchSystemData();
 
-    // Setup live WebSocket feed listener
     let ws: WebSocket | null = null;
-    try {
-      const wsUrl = API_BASE.replace(/^http/, "ws") + "/api/ws/feed";
-      ws = new WebSocket(wsUrl);
-      ws.onopen = () => {
-        setWsConnected(true);
-      };
-      ws.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          if (payload.event === "sync_completed" || payload.event === "firehose_pulse") {
-            setLiveAlert(payload.message || "New stories ingested & clustered!");
-            fetchSystemData();
-            fetchTopics();
-            setTimeout(() => setLiveAlert(null), 4000);
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let attempts = 0;
+    let isUnmounted = false;
+
+    const connectWebSocket = () => {
+      if (isUnmounted) return;
+      try {
+        const wsUrl = API_BASE.replace(/^http/, "ws") + "/api/ws/feed";
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          if (isUnmounted) return;
+          setWsConnected(true);
+          attempts = 0;
+          setWsReconnectAttempts(0);
+        };
+
+        ws.onmessage = (event) => {
+          if (isUnmounted) return;
+          try {
+            const payload = JSON.parse(event.data);
+            if (payload.event === "sync_completed" || payload.event === "firehose_pulse") {
+              setLiveAlert(payload.message || "New stories ingested & clustered!");
+              fetchSystemData();
+              fetchTopics();
+              setTimeout(() => setLiveAlert(null), 4000);
+            }
+          } catch (err) {
+            console.error("WS parse error:", err);
           }
-        } catch (err) {
-          console.error("WS parse error:", err);
-        }
-      };
-      ws.onclose = () => {
+        };
+
+        ws.onclose = () => {
+          if (isUnmounted) return;
+          setWsConnected(false);
+          // Exponential backoff: min 1s, doubling up to 16s
+          attempts += 1;
+          setWsReconnectAttempts(attempts);
+          const delay = Math.min(1000 * Math.pow(2, attempts - 1), 16000);
+          reconnectTimeout = setTimeout(connectWebSocket, delay);
+        };
+
+        ws.onerror = () => {
+          if (ws) ws.close();
+        };
+      } catch (e) {
         setWsConnected(false);
-      };
-    } catch (e) {
-      console.warn("WebSocket connection failure:", e);
-    }
+        attempts += 1;
+        setWsReconnectAttempts(attempts);
+        const delay = Math.min(1000 * Math.pow(2, attempts - 1), 16000);
+        reconnectTimeout = setTimeout(connectWebSocket, delay);
+      }
+    };
+
+    connectWebSocket();
 
     const interval = setInterval(fetchSystemData, 15000);
     return () => {
+      isUnmounted = true;
       clearInterval(interval);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
       if (ws) ws.close();
     };
   }, []);
@@ -386,10 +418,27 @@ export default function Dashboard() {
 
         {/* Global Controls & Status Indicators */}
         <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-2 text-xs">
-            <span className={`inline-block w-2.5 h-2.5 rounded-full ${wsConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+          <div
+            title={
+              wsConnected
+                ? "WebSocket stream active: real-time live ingestion and firehose updates connected"
+                : wsReconnectAttempts > 0
+                ? `WebSocket disconnected: automatic reconnection active (attempt ${wsReconnectAttempts}), falling back to background HTTP polling`
+                : "WebSocket offline: using background HTTP polling"
+            }
+            className="flex items-center space-x-2 text-xs bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700/80 cursor-help"
+          >
+            <span
+              className={`inline-block w-2 h-2 rounded-full ${
+                wsConnected
+                  ? "bg-emerald-400 animate-pulse"
+                  : wsReconnectAttempts > 0
+                  ? "bg-amber-400 animate-ping"
+                  : "bg-amber-500"
+              }`}
+            />
             <span className="text-slate-300 font-medium hidden sm:inline">
-              {wsConnected ? "Live WS" : "Polling"}
+              {wsConnected ? "Live WS" : wsReconnectAttempts > 0 ? `Reconnecting (${wsReconnectAttempts})` : "Polling"}
             </span>
           </div>
 

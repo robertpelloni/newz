@@ -2,6 +2,13 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.6.0] - 2026-10-24
+### Added
+- Resilient WebSocket streaming with exponential backoff automatic reconnection (1s scaling to 16s) in `frontend/src/app/page.tsx`.
+- Connection lifecycle indicator badge with informative tooltip ("Live WS", "Reconnecting (attempt #)", or "Polling fallback").
+- All 14 backend unit and integration tests passing.
+- Verified visual connectivity indicators via automated Playwright test suite.
+
 ## [0.5.9] - 2026-10-24
 ### Added
 - Curated Reading List Export in Markdown and JSON formats (`handleExportBookmarks`) for offline intelligence briefs and reporting.

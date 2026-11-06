@@ -31,3 +31,4 @@
 - [x] Validate PWA offline operation via Playwright headless test and visual screenshot verification.
 - [x] Implement topic bookmarking, localStorage state persistence, and "★ Bookmarks" filter tab (v0.5.8).
 - [x] Implement Reading List Markdown and JSON export for offline briefs (v0.5.9).
+- [x] Implement WebSocket auto-reconnect with exponential backoff and indicator tooltips (v0.6.0).
