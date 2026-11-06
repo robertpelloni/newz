@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.5.7] - 2026-10-24
+### Added
+- Upgraded `frontend/public/sw.js` with dedicated `omnifeed-api-v2` cache bucket using Network-First with Cache Fallback for all `/api/` GET requests.
+- Implemented automatic local storage backup caching and seamless recovery for topic intelligence in `frontend/src/app/page.tsx`.
+- Created Playwright offline verification test (`/home/jules/verification/verify_pwa_offline.py`) and visually confirmed amber offline banner with cached topic rendering.
+- Developed `/home/jules/self_created_tools/pwa_validator.py` for automated PWA asset and service worker compliance checking.
+- Maintained 100% test pass rate across backend test suite (14/14).
+
 ## [0.5.6] - 2026-10-24
 ### Added
 - Refined Tauri v2 desktop application bundle with `build.rs`, application icons (`icon.png`, `32x32.png`, `128x128.png`), and `tauri::Builder` runner in `frontend/src-tauri/src/main.rs`.

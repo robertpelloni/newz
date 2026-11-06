@@ -200,14 +200,32 @@ export default function Dashboard() {
           setTopics(data.items);
           setTotalTopics(data.total);
           setTotalPages(data.total_pages);
-        } else {
+          try {
+            localStorage.setItem("omnifeed_cached_topics", JSON.stringify(data));
+          } catch (_) {}
+        } else if (Array.isArray(data)) {
           setTopics(data);
           setTotalTopics(data.length);
           setTotalPages(1);
+          try {
+            localStorage.setItem("omnifeed_cached_topics", JSON.stringify({ items: data, total: data.length, total_pages: 1 }));
+          } catch (_) {}
         }
       }
     } catch (e) {
       console.error("Error fetching topics:", e);
+      // Seamless offline recovery: load last cached topics from localStorage
+      try {
+        const cached = localStorage.getItem("omnifeed_cached_topics");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.items) {
+            setTopics(parsed.items);
+            setTotalTopics(parsed.total || parsed.items.length);
+            setTotalPages(parsed.total_pages || 1);
+          }
+        }
+      } catch (_) {}
     } finally {
       setLoading(false);
     }

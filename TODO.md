@@ -27,3 +27,5 @@
 - [x] Enrich topic timeline tracking with chronologically sorted, rich correlation metadata and polarity indicators.
 - [x] Detail Deep Architectural Component Specifications in README.md.
 - [x] Refine Tauri v2 desktop application bundle (build.rs, icons, tauri::Builder) and offline UX banner.
+- [x] Upgrade Service Worker with dedicated API cache bucket (`omnifeed-api-v2`) and offline localStorage fallback for topic feeds (v0.5.7).
+- [x] Validate PWA offline operation via Playwright headless test and visual screenshot verification.

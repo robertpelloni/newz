@@ -1,37 +1,22 @@
-# Session Handoff & Continuity Notes
+# Omnifeed (Newz) - Session Handoff & Architecture Notes
 
-## 1. What Was Learned & Discovered
-- **Upstream Scaffolding**: An unmerged upstream branch `origin/omnifeed-scaffolding-v1-12010847412342953271` contained the base project skeleton. Merging required `--allow-unrelated-histories` and fixing an import error (`Source` model not imported into `backend/models.py`).
-- **Postgres Dependency Decoupling**: Without local Postgres/Redis, the backend previously crashed on boot. Adding a graceful SQLite fallback (`sqlite:///./omnifeed.db`) in `backend/database.py` allows full out-of-the-box local operation while maintaining full PostgreSQL compatibility in production.
-- **Frontend Build & Styling**: Next.js 15 with Tailwind CSS v4 required `@tailwindcss/postcss` and a proper `postcss.config.mjs` file to render styles accurately.
-- **Consolidation**: The dashboard was consolidated into a single-page ultra-dense intelligence dashboard (`frontend/src/app/page.tsx`) with category filters, real-time search, global sentiment indicators, source health badges, and modal topic deep-dives.
-- **System Tray**: `scripts/system_tray.py` allows command-line and tray-based service status queries, sync triggering, browser launching, and graceful shutdown.
-- **Milestone 2 & 3 Completion**:
-  - Unsupervised entity parsing and cross-source chronological narrative timeline markers persisted to `Topic` models.
-  - Real-time social firehose streaming (`/api/firehose/simulate`) for Bluesky AT Protocol Jetstream and Mastodon Fediverse timelines.
-  - Local LLM / Ollama bulleted summary generation bridge (`generate_ai_summary`) and `/api/topics/{id}/summarize` endpoint.
-  - Frontend operational dashboard with real-time WebSocket toast alerts, firehose streaming triggers, OLED contrast toggling, CSV/JSON topic exports, and deep-dive modal with AI synthesis refresh buttons.
-- **Milestone 4 Completion & Architectural Design**:
-  - Configured Tauri v2 native desktop application wrapper in `frontend/src-tauri/` (`Cargo.toml`, `tauri.conf.json`, `src/main.rs`, `build.rs`, icons).
-  - Next.js static export pipeline (`output: 'export'`) configured in `frontend/next.config.ts` delivering production assets to `frontend/out`.
-  - Added desktop lifecycle npm scripts (`tauri:dev`, `tauri:build`) in `frontend/package.json`.
-  - PWA offline caching service worker implemented in `frontend/public/sw.js` and registered in `frontend/src/app/page.tsx` with `manifest.json`.
-  - Online/offline network listeners and reactive offline alert banner in `frontend/src/app/page.tsx`.
-  - Comprehensive data flow architecture diagram and ingestion mechanics specified in `README.md`, `VISION.md`, and `MEMORY.md`.
-  - Dynamic single-source versioning helper (`get_app_version()`) wired in `backend/main.py` directly loading from `VERSION.md`.
-  - Chronological timeline tracking in `worker/tasks.py` upgraded with `source_type`, `polarity`, standardized timezone-aware UTC timestamps, and UI chips in `frontend/src/app/page.tsx`.
-  - Deep Architectural Component Specifications articulated in `README.md` across Data Ingestion, Processing/Enrichment Pipeline, and Consolidated Presentation Layer.
+## Session Summary (v0.5.7)
+In this release iteration, we upgraded and verified the Progressive Web App (PWA) offline data capabilities for Omnifeed:
+1. **Offline Service Worker API Caching**:
+   - Upgraded `frontend/public/sw.js` with dedicated `omnifeed-api-v2` cache bucket.
+   - Implemented a **Network-First with Cache Fallback** strategy for all `/api/` GET endpoints (topics, sentiment, system status).
+   - Preserved Stale-While-Revalidate caching for static frontend bundles and assets.
+2. **Graceful UI Fallback & Local Storage Backup**:
+   - Enhanced `frontend/src/app/page.tsx` with automatic localStorage mirroring (`omnifeed_cached_topics`).
+   - If network requests fail during offline mode, the dashboard automatically falls back to cached topic payloads.
+3. **Automated Verification**:
+   - Developed a custom reusable inspection tool `/home/jules/self_created_tools/pwa_validator.py`.
+   - Executed Playwright headless browser test (`/home/jules/verification/verify_pwa_offline.py`) verifying offline banner activation and persistent cached card rendering.
+   - Visually inspected and confirmed generated screenshot `pwa_offline_verification.png`.
+4. **Backend Health & Tests**:
+   - Verified 14/14 unit and integration tests passing (`python -m pytest backend/tests/ -v`).
+   - Dynamic single-source versioning synced with `VERSION.md` (v0.5.7).
 
-## 2. Current State of Running Processes
-- Backend: Uvicorn running on `0.0.0.0:8000` (live, passing all 14 automated API & model tests).
-- Frontend: Next.js static production bundle exported to `frontend/out/` and server verified on `0.0.0.0:3000`.
-- SQLite Database: `omnifeed.db` populated with real-time news clusters, social sentiment records, entity extractions, and timeline events.
-
-## 3. Resume Instructions for Next Session
-- To run tests: `/home/jules/.pyenv/shims/python3 -m pytest backend/tests/ -v`
-- To run worker sync: `python3 scripts/system_tray.py --sync`
-- To stream firehose: `curl -X POST http://localhost:8000/api/firehose/simulate`
-- To build static frontend export: `npm --prefix frontend run build`
-- To build desktop binary: `npm --prefix frontend run tauri:build`
-- To inspect UI: Visit `http://localhost:3000`
-- To stop all servers cleanly: `python3 scripts/system_tray.py --stop`
+## Next Steps for Successor Models:
+- Optional: Add IndexedDB persistence for offline article bookmarking and full-text offline search.
+- Optional: Extend Tauri Rust bridge for native OS notifications on live firehose matches.

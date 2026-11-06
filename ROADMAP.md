@@ -24,5 +24,6 @@
 - [x] Native system tray integration with OS notifications for breaking high-controversy topics.
 - [x] Static export compilation pipeline (`frontend/out`) for offline-capable desktop shell.
 - [x] Mobile-optimized PWA with offline caching (`manifest.json` and `sw.js`).
+- [x] Dedicated offline API data caching with Network-First Cache-Fallback strategy and localStorage persistence (v0.5.7).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).
