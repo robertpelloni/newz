@@ -12,10 +12,11 @@
   - Local LLM / Ollama bulleted summary generation bridge (`generate_ai_summary`) and `/api/topics/{id}/summarize` endpoint.
   - Frontend operational dashboard with real-time WebSocket toast alerts, firehose streaming triggers, OLED contrast toggling, CSV/JSON topic exports, and deep-dive modal with AI synthesis refresh buttons.
 - **Milestone 4 Completion & Architectural Design**:
-  - Configured Tauri v2 native desktop application wrapper in `frontend/src-tauri/` (`Cargo.toml`, `tauri.conf.json`, `src/main.rs`).
+  - Configured Tauri v2 native desktop application wrapper in `frontend/src-tauri/` (`Cargo.toml`, `tauri.conf.json`, `src/main.rs`, `build.rs`, icons).
   - Next.js static export pipeline (`output: 'export'`) configured in `frontend/next.config.ts` delivering production assets to `frontend/out`.
   - Added desktop lifecycle npm scripts (`tauri:dev`, `tauri:build`) in `frontend/package.json`.
   - PWA offline caching service worker implemented in `frontend/public/sw.js` and registered in `frontend/src/app/page.tsx` with `manifest.json`.
+  - Online/offline network listeners and reactive offline alert banner in `frontend/src/app/page.tsx`.
   - Comprehensive data flow architecture diagram and ingestion mechanics specified in `README.md`, `VISION.md`, and `MEMORY.md`.
   - Dynamic single-source versioning helper (`get_app_version()`) wired in `backend/main.py` directly loading from `VERSION.md`.
   - Chronological timeline tracking in `worker/tasks.py` upgraded with `source_type`, `polarity`, standardized timezone-aware UTC timestamps, and UI chips in `frontend/src/app/page.tsx`.

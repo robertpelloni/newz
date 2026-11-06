@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.5.6] - 2026-10-24
+### Added
+- Refined Tauri v2 desktop application bundle with `build.rs`, application icons (`icon.png`, `32x32.png`, `128x128.png`), and `tauri::Builder` runner in `frontend/src-tauri/src/main.rs`.
+- Enhanced offline user experience with online/offline connectivity listeners and reactive status banners in `frontend/src/app/page.tsx`.
+- All 14 backend unit and integration tests passing.
+
 ## [0.5.5] - 2026-10-24
 ### Added
 - Explicit Deep Architectural Component Specifications in `README.md` detailing Component 1 (Multi-Source Data Ingestion Engine), Component 2 (Processing & Enrichment Pipeline), and Component 3 (Consolidated Presentation Layer).

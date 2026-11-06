@@ -87,15 +87,28 @@ export default function Dashboard() {
   const [pageSize, setPageSize] = useState<number>(9);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalTopics, setTotalTopics] = useState<number>(0);
+  const [isOffline, setIsOffline] = useState<boolean>(false);
 
   const categories = ["All", "General", "Technology", "Business", "Politics", "Science", "Entertainment"];
 
-  // Register PWA service worker
+  // Register PWA service worker & online/offline listener
   useEffect(() => {
-    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch((err) => {
-        console.warn("Service worker registration failed:", err);
-      });
+    if (typeof window !== "undefined") {
+      setIsOffline(!navigator.onLine);
+      const handleOnline = () => setIsOffline(false);
+      const handleOffline = () => setIsOffline(true);
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js").catch((err) => {
+          console.warn("Service worker registration failed:", err);
+        });
+      }
+      return () => {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+      };
     }
   }, []);
 
@@ -371,6 +384,13 @@ export default function Dashboard() {
           </button>
         </div>
       </header>
+
+      {/* Offline Status Banner */}
+      {isOffline && (
+        <div className="bg-amber-600 text-slate-950 text-xs font-bold px-4 py-1.5 text-center shadow transition-all">
+          📡 Offline Mode: Displaying cached intelligence feeds from local service worker cache.
+        </div>
+      )}
 
       {/* Live Alert Toast */}
       {liveAlert && (
