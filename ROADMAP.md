@@ -25,3 +25,4 @@
 - [x] Static export compilation pipeline (`frontend/out`) for offline-capable desktop shell.
 - [x] Mobile-optimized PWA with offline caching (`manifest.json` and `sw.js`).
 - [x] Data flow architecture specification and multi-source pipeline design.
+- [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

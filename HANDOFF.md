@@ -19,6 +19,7 @@
   - Comprehensive data flow architecture diagram and ingestion mechanics specified in `README.md`, `VISION.md`, and `MEMORY.md`.
   - Dynamic single-source versioning helper (`get_app_version()`) wired in `backend/main.py` directly loading from `VERSION.md`.
   - Chronological timeline tracking in `worker/tasks.py` upgraded with `source_type`, `polarity`, standardized timezone-aware UTC timestamps, and UI chips in `frontend/src/app/page.tsx`.
+  - Deep Architectural Component Specifications articulated in `README.md` across Data Ingestion, Processing/Enrichment Pipeline, and Consolidated Presentation Layer.
 
 ## 2. Current State of Running Processes
 - Backend: Uvicorn running on `0.0.0.0:8000` (live, passing all 14 automated API & model tests).

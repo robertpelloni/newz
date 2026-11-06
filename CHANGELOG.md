@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.5.5] - 2026-10-24
+### Added
+- Explicit Deep Architectural Component Specifications in `README.md` detailing Component 1 (Multi-Source Data Ingestion Engine), Component 2 (Processing & Enrichment Pipeline), and Component 3 (Consolidated Presentation Layer).
+- Fully documented backend, worker, frontend, and desktop subsystems.
+- All 14 unit and integration tests passing.
+
 ## [0.5.4] - 2026-10-24
 ### Added
 - Rich narrative evolution metadata (`source_type`, `polarity`, standardized timezone-aware UTC timestamps) in `worker/tasks.py`.
