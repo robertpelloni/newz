@@ -33,3 +33,4 @@
 - [x] Implement Reading List Markdown and JSON export for offline briefs (v0.5.9).
 - [x] Implement WebSocket auto-reconnect with exponential backoff and indicator tooltips (v0.6.0).
 - [x] Multi-runtime platform detection (Tauri desktop / PWA / Web) and offline sync queue with automated replay (v0.6.1).
+- [x] Automated PWA offline distribution build script (`scripts/build_offline_distribution.sh`) and offline documentation (v0.6.2).

@@ -2,6 +2,13 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.6.2] - 2026-10-24
+### Added
+- Automated offline and PWA distribution build script (`scripts/build_offline_distribution.sh`) validating Web Manifest schemas, icons, Next.js build compilation, and service worker compliance.
+- Added 192x192 and 512x512 maskable PWA icons to `frontend/public/` referenced in `manifest.json`.
+- Comprehensive offline execution documentation in `DEPLOY.md` and `README.md` covering PWA caching, localStorage fallback, and offline sync queue mechanisms.
+- Verified 14/14 backend unit/integration tests and production Next.js build pass.
+
 ## [0.6.1] - 2026-10-24
 ### Added
 - Multi-runtime platform detection chip in navigation bar dynamically resolving `Desktop (Tauri)`, `PWA`, or `Web` based on browser capabilities and window bindings.
