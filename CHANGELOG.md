@@ -2,6 +2,25 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.5.6] - 2026-10-24
+### Added
+- Refined Tauri v2 desktop application bundle with `build.rs`, application icons (`icon.png`, `32x32.png`, `128x128.png`), and `tauri::Builder` runner in `frontend/src-tauri/src/main.rs`.
+- Enhanced offline user experience with online/offline connectivity listeners and reactive status banners in `frontend/src/app/page.tsx`.
+- All 14 backend unit and integration tests passing.
+
+## [0.5.5] - 2026-10-24
+### Added
+- Explicit Deep Architectural Component Specifications in `README.md` detailing Component 1 (Multi-Source Data Ingestion Engine), Component 2 (Processing & Enrichment Pipeline), and Component 3 (Consolidated Presentation Layer).
+- Fully documented backend, worker, frontend, and desktop subsystems.
+- All 14 unit and integration tests passing.
+
+## [0.5.4] - 2026-10-24
+### Added
+- Rich narrative evolution metadata (`source_type`, `polarity`, standardized timezone-aware UTC timestamps) in `worker/tasks.py`.
+- Strict chronological timeline sorting when correlating new wire and social firehose articles.
+- Visual timeline presentation updates in `frontend/src/app/page.tsx` displaying source badges, sentiment chips, and formatted timestamps.
+- Automated unit test `test_chronological_timeline_metadata_and_ordering` in `backend/tests/test_api.py` (14/14 tests passing).
+
 ## [0.5.3] - 2026-10-24
 ### Added
 - Dynamic single-source versioning helper (`get_app_version()`) in `backend/main.py` directly loading from `VERSION.md`.

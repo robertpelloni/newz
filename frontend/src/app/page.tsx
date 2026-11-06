@@ -38,6 +38,8 @@ interface TopicDetail {
       timestamp: string;
       headline: string;
       source: string;
+      source_type?: string;
+      polarity?: number;
       url: string;
     }>;
   };
@@ -85,15 +87,28 @@ export default function Dashboard() {
   const [pageSize, setPageSize] = useState<number>(9);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalTopics, setTotalTopics] = useState<number>(0);
+  const [isOffline, setIsOffline] = useState<boolean>(false);
 
   const categories = ["All", "General", "Technology", "Business", "Politics", "Science", "Entertainment"];
 
-  // Register PWA service worker
+  // Register PWA service worker & online/offline listener
   useEffect(() => {
-    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch((err) => {
-        console.warn("Service worker registration failed:", err);
-      });
+    if (typeof window !== "undefined") {
+      setIsOffline(!navigator.onLine);
+      const handleOnline = () => setIsOffline(false);
+      const handleOffline = () => setIsOffline(true);
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js").catch((err) => {
+          console.warn("Service worker registration failed:", err);
+        });
+      }
+      return () => {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+      };
     }
   }, []);
 
@@ -370,6 +385,13 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* Offline Status Banner */}
+      {isOffline && (
+        <div className="bg-amber-600 text-slate-950 text-xs font-bold px-4 py-1.5 text-center shadow transition-all">
+          📡 Offline Mode: Displaying cached intelligence feeds from local service worker cache.
+        </div>
+      )}
+
       {/* Live Alert Toast */}
       {liveAlert && (
         <div className="bg-cyan-600 text-white text-xs font-semibold px-4 py-2 text-center shadow-lg transition-all animate-bounce">
@@ -631,10 +653,20 @@ export default function Dashboard() {
                       {topicDetail.topic.timeline.map((event, idx) => (
                         <div key={idx} className="relative group">
                           <div className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full bg-cyan-400 group-hover:scale-125 transition" />
-                          <div className="text-xs">
+                          <div className="text-xs flex items-center space-x-2">
                             <span className="text-cyan-400 font-semibold">{event.source}</span>
-                            <span className="text-slate-500 ml-2">
-                              {event.timestamp ? new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recently"}
+                            {event.source_type && (
+                              <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded">
+                                {event.source_type}
+                              </span>
+                            )}
+                            {event.polarity !== undefined && (
+                              <span className={`text-[10px] font-bold ${event.polarity > 0 ? "text-emerald-400" : event.polarity < 0 ? "text-rose-400" : "text-slate-400"}`}>
+                                {event.polarity > 0 ? "+" : ""}{Math.round(event.polarity * 100)}%
+                              </span>
+                            )}
+                            <span className="text-slate-500">
+                              {event.timestamp ? new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recent"}
                             </span>
                           </div>
                           <p className="text-xs text-slate-200 mt-0.5">{event.headline}</p>

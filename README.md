@@ -4,7 +4,7 @@
 
 ---
 
-## 1. Data Flow & Architecture Specification
+## 1. Data Flow Architecture & System Diagram
 
 The Omnifeed data processing pipeline operates as a real-time reactive ingestion and synthesis loop connecting heterogeneous raw feeds to an ultra-dense intelligence frontend.
 
@@ -83,19 +83,31 @@ The Omnifeed data processing pipeline operates as a real-time reactive ingestion
 
 ---
 
-## 2. Ingestion & Normalization Mechanics
+## 2. Core Architectural Components
 
-### Multi-Source Feeds
-- **Mainstream Wires**: Parsed from XML/RSS structures (`Google News`, `Yahoo News`, `MSN News`). Items include title, publication date, URL, and summary descriptions.
-- **Link Aggregators**: Public JSON endpoints from `Reddit` (e.g., `/r/news`, `/r/technology`) capturing submission titles, authors, comment counts, and direct community commentary bodies.
-- **Social Firehoses**: Simulated real-time micro-commentary streams from the `Bluesky AT Protocol Jetstream` and `Mastodon Fediverse` public firehoses, capturing fast-moving developments and distributed social reactions.
+Omnifeed's architectural foundation is partitioned into three foundational subsystems:
 
-### Topic Clustering & Narrative Evolution
-- **Similarity Scoring**: Token sets are extracted using regular expressions, stripped of stop words, and compared against active topic clusters using Jaccard similarity:
+### Component 1: Multi-Source Data Ingestion Engine
+- **Mainstream Wires**: High-frequency XML/RSS pollers for Google News, Yahoo News, and MSN News, extracting structured headlines, links, publication timestamps, and snippet contents.
+- **Link Aggregators**: Automated JSON parsers for Reddit (`/r/news`, `/r/technology`), Hacker News Firebase API, and Lobsters capturing submissions, vote velocities, author metadata, and discussion threads.
+- **Real-Time Social Firehoses**: Subscribers for the Bluesky AT Protocol Jetstream and Mastodon Fediverse public timelines (`/api/firehose/simulate`), capturing instant micro-reactions and breaking bulletins.
+- **Sanitization & Token Pre-Processing**: HTML stripping, lowercase regex normalization (`[a-zA-Z]{3,}`), and 50+ stop-word elimination to yield informative semantic token sets.
+
+### Component 2: Processing & Enrichment Pipeline
+- **Unsupervised Topic Clustering**: Token-based Jaccard similarity engine:
   $$\text{Jaccard}(A, B) = \frac{|A \cap B|}{|A \cup B|}$$
-  Matches exceeding the threshold ($0.25$) are bound to existing topic clusters; unmatched stories spawn new dynamic topics.
-- **Narrative Timeline**: As subsequent stories cluster into a topic, chronological milestone records (`headline`, `source`, `timestamp`, `url`) are appended to `timeline_json`, forming a historical progression of the story.
-- **Named Entity Extraction**: Capitalized multi-word noun candidates are parsed and frequency-ranked, exposing people, organizations, and places as badges in the cluster view.
+  Incoming articles with a similarity score $sim \ge 0.25$ automatically cluster into existing topic entities; otherwise, a new dynamic topic cluster is spawned.
+- **Entity Extraction**: Unsupervised proper-noun n-gram parser that extracts high-frequency named entities (persons, organizations, locations) across cluster documents.
+- **Chronological Narrative Evolution**: Each correlated wire or social article generates an event marker containing `headline`, `source`, `source_type`, `polarity`, `url`, and timezone-aware UTC timestamps, sorted in strict chronological sequence.
+- **Lexicon Polarity & Controversy Scoring**: Keyword polarity evaluation coupled with controversy metrics when competing positive/negative signals coincide.
+- **Local LLM Synthesis Bridge**: Integration with local Ollama instances (`llama3`) for on-demand 3-bullet executive synthesis, backed by deterministic multi-source heuristic fallback.
+
+### Component 3: Consolidated Presentation Layer
+- **Unified Single-Screen Operations Hub**: High-density Next.js 15 and Tailwind CSS v4 dashboard consolidating all features without fragmentation.
+- **Duplex WebSocket Event Streaming**: `/api/ws/feed` channel pushing live ingestion notifications and firehose bursts directly to client UI toast alerts.
+- **Topic Deep-Dive Modal**: Interactive inspector displaying correlated source links, entity tags, chronological timeline nodes, and local AI synthesis summaries.
+- **Dual Persistence Architecture**: Zero-dependency automatic SQLite fallback (`sqlite:///./omnifeed.db`) for immediate standalone developer use, with full PostgreSQL + pgvector support for production scale.
+- **Cross-Platform Delivery**: Tauri v2 native desktop application wrapper (`frontend/src-tauri/`) and Progressive Web App with offline caching (`sw.js` and `manifest.json`).
 
 ---
 
