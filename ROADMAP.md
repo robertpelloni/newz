@@ -26,5 +26,6 @@
 - [x] Mobile-optimized PWA with offline caching (`manifest.json` and `sw.js`).
 - [x] Dedicated offline API data caching with Network-First Cache-Fallback strategy and localStorage persistence (v0.5.7).
 - [x] Client-side topic bookmarking and local storage persistence for offline reading (v0.5.8).
+- [x] Curated Reading List export in Markdown and JSON for reporting and offline digests (v0.5.9).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

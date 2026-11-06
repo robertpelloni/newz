@@ -30,3 +30,4 @@
 - [x] Upgrade Service Worker with dedicated API cache bucket (`omnifeed-api-v2`) and offline localStorage fallback for topic feeds (v0.5.7).
 - [x] Validate PWA offline operation via Playwright headless test and visual screenshot verification.
 - [x] Implement topic bookmarking, localStorage state persistence, and "★ Bookmarks" filter tab (v0.5.8).
+- [x] Implement Reading List Markdown and JSON export for offline briefs (v0.5.9).

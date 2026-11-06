@@ -2,6 +2,13 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.5.9] - 2026-10-24
+### Added
+- Curated Reading List Export in Markdown and JSON formats (`handleExportBookmarks`) for offline intelligence briefs and reporting.
+- Restructured universal Export dropdown dividing standard filtered feed topics from starred reading list exports.
+- Verified visual menu layout and blob generation via Playwright automated headless tests.
+- All 14 backend unit and integration tests passing.
+
 ## [0.5.8] - 2026-10-24
 ### Added
 - Client-side topic bookmarking and offline persistence: star bookmark toggle buttons on topic cards, in-modal bookmarking actions, and automatic localStorage synchronization (`omnifeed_bookmarks`).

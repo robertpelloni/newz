@@ -333,6 +333,41 @@ export default function Dashboard() {
     window.open(url.toString(), "_blank");
   };
 
+  const handleExportBookmarks = (format: "markdown" | "json") => {
+    setShowExportMenu(false);
+    const saved = topics.filter((t) => bookmarkedIds.includes(t.id));
+    if (saved.length === 0) {
+      alert("No bookmarked topics to export. Star a topic first!");
+      return;
+    }
+
+    if (format === "json") {
+      const blob = new Blob([JSON.stringify(saved, null, 2)], { type: "application/json" });
+      const dlUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = dlUrl;
+      a.download = `omnifeed_bookmarks_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(dlUrl);
+    } else {
+      let md = `# Omnifeed Intelligence Reading List\n\n*Generated on: ${new Date().toUTCString()}*\n\n`;
+      saved.forEach((t, i) => {
+        md += `### ${i + 1}. [${t.category?.toUpperCase() || "GENERAL"}] ${t.title}\n\n`;
+        md += `> ${t.summary}\n\n`;
+        md += `- **Articles correlated**: ${t.article_count}\n`;
+        md += `- **Last updated**: ${t.last_updated || "N/A"}\n\n`;
+        md += `---\n\n`;
+      });
+      const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+      const dlUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = dlUrl;
+      a.download = `omnifeed_bookmarks_${new Date().toISOString().slice(0, 10)}.md`;
+      a.click();
+      URL.revokeObjectURL(dlUrl);
+    }
+  };
+
   return (
     <div className={`min-h-screen ${oledMode ? "bg-black text-neutral-100" : "bg-slate-950 text-slate-100"} flex flex-col font-sans transition-colors duration-200`}>
       {/* Top Universal Navbar */}
@@ -378,19 +413,37 @@ export default function Dashboard() {
               <span className="text-[10px]">▼</span>
             </button>
             {showExportMenu && (
-              <div className="absolute right-0 mt-1 w-36 bg-slate-900 border border-slate-700 rounded-lg shadow-xl py-1 z-50 text-xs">
-                <button
-                  onClick={() => handleExport("json")}
-                  className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-cyan-400 transition"
-                >
-                  Export as JSON
-                </button>
-                <button
-                  onClick={() => handleExport("csv")}
-                  className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-cyan-400 transition"
-                >
-                  Export as CSV
-                </button>
+              <div className="absolute right-0 mt-1 w-48 bg-slate-900 border border-slate-700 rounded-lg shadow-xl py-1 z-50 text-xs divide-y divide-slate-800">
+                <div className="py-1">
+                  <div className="px-3 py-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Feed Topics</div>
+                  <button
+                    onClick={() => handleExport("json")}
+                    className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-cyan-400 transition"
+                  >
+                    Export All (JSON)
+                  </button>
+                  <button
+                    onClick={() => handleExport("csv")}
+                    className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-cyan-400 transition"
+                  >
+                    Export All (CSV)
+                  </button>
+                </div>
+                <div className="py-1">
+                  <div className="px-3 py-1 text-[10px] font-semibold text-amber-500 uppercase tracking-wider">★ Reading List</div>
+                  <button
+                    onClick={() => handleExportBookmarks("markdown")}
+                    className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-amber-400 transition"
+                  >
+                    Export Bookmarks (MD)
+                  </button>
+                  <button
+                    onClick={() => handleExportBookmarks("json")}
+                    className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-amber-400 transition"
+                  >
+                    Export Bookmarks (JSON)
+                  </button>
+                </div>
               </div>
             )}
           </div>
