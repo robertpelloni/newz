@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.6.3] - 2026-10-24
+### Added
+- Created dedicated end-to-end automated offline verification script (`scripts/test_offline_data_access.py`) simulating disconnected browser state, validating service worker caching, checking local topic persistence, and testing offline sync queue operations.
+- Synchronized Tauri desktop configuration bundle version to v0.6.3 (`frontend/src-tauri/tauri.conf.json`).
+- Verified 14/14 backend unit/integration tests and offline access suite execution.
+
 ## [0.6.2] - 2026-10-24
 ### Added
 - Automated offline and PWA distribution build script (`scripts/build_offline_distribution.sh`) validating Web Manifest schemas, icons, Next.js build compilation, and service worker compliance.

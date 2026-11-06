@@ -30,5 +30,6 @@
 - [x] Resilient live WebSocket auto-reconnect with exponential backoff and connection status telemetry (v0.6.0).
 - [x] Multi-runtime platform detection and client-side offline sync queue with automatic replay on reconnect (v0.6.1).
 - [x] Automated PWA offline distribution build pipeline and comprehensive offline documentation (v0.6.2).
+- [x] End-to-end automated offline data access validation script and Tauri config synchronization (v0.6.3).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).
