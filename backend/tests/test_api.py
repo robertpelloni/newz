@@ -104,3 +104,23 @@ def test_topic_ai_summary_endpoint():
         assert data["status"] == "success"
         assert "summary" in data
         assert len(data["summary"]) > 0
+
+def test_chronological_timeline_metadata_and_ordering():
+    # Ingest firehose to ensure fresh timeline markers
+    client.post("/api/firehose/simulate")
+    topics_res = client.get("/api/topics")
+    assert topics_res.status_code == 200
+    items = topics_res.json()["items"]
+    assert len(items) > 0
+    topic_id = items[0]["id"]
+    detail_res = client.get(f"/api/topics/{topic_id}")
+    assert detail_res.status_code == 200
+    timeline = detail_res.json()["topic"]["timeline"]
+    assert isinstance(timeline, list)
+    if len(timeline) > 1:
+        # Check chronological timestamps order
+        timestamps = [m.get("timestamp") for m in timeline if m.get("timestamp")]
+        assert timestamps == sorted(timestamps)
+    for marker in timeline:
+        assert "headline" in marker
+        assert "source" in marker

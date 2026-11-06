@@ -2,6 +2,13 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.5.4] - 2026-10-24
+### Added
+- Rich narrative evolution metadata (`source_type`, `polarity`, standardized timezone-aware UTC timestamps) in `worker/tasks.py`.
+- Strict chronological timeline sorting when correlating new wire and social firehose articles.
+- Visual timeline presentation updates in `frontend/src/app/page.tsx` displaying source badges, sentiment chips, and formatted timestamps.
+- Automated unit test `test_chronological_timeline_metadata_and_ordering` in `backend/tests/test_api.py` (14/14 tests passing).
+
 ## [0.5.3] - 2026-10-24
 ### Added
 - Dynamic single-source versioning helper (`get_app_version()`) in `backend/main.py` directly loading from `VERSION.md`.

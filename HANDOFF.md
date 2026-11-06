@@ -18,9 +18,10 @@
   - PWA offline caching service worker implemented in `frontend/public/sw.js` and registered in `frontend/src/app/page.tsx` with `manifest.json`.
   - Comprehensive data flow architecture diagram and ingestion mechanics specified in `README.md`, `VISION.md`, and `MEMORY.md`.
   - Dynamic single-source versioning helper (`get_app_version()`) wired in `backend/main.py` directly loading from `VERSION.md`.
+  - Chronological timeline tracking in `worker/tasks.py` upgraded with `source_type`, `polarity`, standardized timezone-aware UTC timestamps, and UI chips in `frontend/src/app/page.tsx`.
 
 ## 2. Current State of Running Processes
-- Backend: Uvicorn running on `0.0.0.0:8000` (live, passing all 13 automated API & model tests).
+- Backend: Uvicorn running on `0.0.0.0:8000` (live, passing all 14 automated API & model tests).
 - Frontend: Next.js static production bundle exported to `frontend/out/` and server verified on `0.0.0.0:3000`.
 - SQLite Database: `omnifeed.db` populated with real-time news clusters, social sentiment records, entity extractions, and timeline events.
 

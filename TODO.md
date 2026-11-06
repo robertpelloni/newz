@@ -24,3 +24,4 @@
 - [x] Implement mobile PWA service worker with offline cache fallback (`manifest.json` and `sw.js`).
 - [x] Complete end-to-end data flow architecture diagram and ingestion documentation in README.md.
 - [x] Implement dynamic single-source versioning helper in `backend/main.py` referencing `VERSION.md`.
+- [x] Enrich topic timeline tracking with chronologically sorted, rich correlation metadata and polarity indicators.

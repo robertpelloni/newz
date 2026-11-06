@@ -207,11 +207,15 @@ def cluster_and_persist(db, raw_articles, source_name, source_type):
                 matched_topic = topic
                 break
 
+        score, controversy = simple_sentiment_analysis(art.title)
         entities = extract_named_entities(art.title + " " + (art.raw_content or ""))
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
         timeline_marker = {
-            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "timestamp": now_utc.isoformat(),
             "headline": art.title,
             "source": source_name,
+            "source_type": source_type,
+            "polarity": score,
             "url": art.url
         }
 
@@ -222,8 +226,8 @@ def cluster_and_persist(db, raw_articles, source_name, source_type):
                 title=art.title,
                 summary=summary,
                 category=category,
-                first_seen=datetime.datetime.utcnow(),
-                last_updated=datetime.datetime.utcnow(),
+                first_seen=now_utc,
+                last_updated=now_utc,
                 entities_json=entities,
                 timeline_json=[timeline_marker]
             )
@@ -232,16 +236,17 @@ def cluster_and_persist(db, raw_articles, source_name, source_type):
             db.refresh(matched_topic)
             existing_topics.append(matched_topic)
         else:
-            matched_topic.last_updated = datetime.datetime.utcnow()
+            matched_topic.last_updated = now_utc
             # Merge entities
             current_ents = set(matched_topic.entities_json or [])
             current_ents.update(entities)
             matched_topic.entities_json = list(current_ents)[:12]
 
-            # Append timeline marker if not already present
+            # Append timeline marker if not already present & sort chronologically
             timeline = list(matched_topic.timeline_json or [])
             if not any(m.get("headline") == art.title for m in timeline):
                 timeline.append(timeline_marker)
+            timeline.sort(key=lambda x: x.get("timestamp", ""))
             matched_topic.timeline_json = timeline
             db.commit()
 
@@ -250,7 +255,6 @@ def cluster_and_persist(db, raw_articles, source_name, source_type):
         db.add(link)
 
         # Generate Sentiment & Discussion placeholder
-        score, controversy = simple_sentiment_analysis(art.title)
         sentiment = models.Sentiment(
             topic_id=matched_topic.id,
             overall_score=score,
@@ -277,20 +281,21 @@ def ingest_social_firehose(limit_per_source: int = 5):
     db = SessionLocal()
     total_added = 0
     try:
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
         # Simulated live Bluesky AT Protocol firehose events
         bluesky_samples = [
             {
-                "title": f"Bluesky Pulse: Global AI governance summit agrees on open safety standard [{datetime.datetime.utcnow().strftime('%H:%M:%S')}]",
-                "url": f"https://bsky.app/profile/techwatcher.bsky.social/post/{int(datetime.datetime.utcnow().timestamp())}",
+                "title": f"Bluesky Pulse: Global AI governance summit agrees on open safety standard [{now_utc.strftime('%H:%M:%S')}]",
+                "url": f"https://bsky.app/profile/techwatcher.bsky.social/post/{int(now_utc.timestamp())}",
                 "content": "Live AT Protocol event: delegations endorse transparent evaluation frameworks for foundation models.",
-                "published_at": datetime.datetime.utcnow(),
+                "published_at": now_utc,
                 "author": "@techwatcher.bsky.social"
             },
             {
-                "title": f"Bluesky Pulse: Major breakthroughs reported in compact fusion reactor containment [{datetime.datetime.utcnow().strftime('%H:%M:%S')}]",
-                "url": f"https://bsky.app/profile/sciencepulse.bsky.social/post/{int(datetime.datetime.utcnow().timestamp())}",
+                "title": f"Bluesky Pulse: Major breakthroughs reported in compact fusion reactor containment [{now_utc.strftime('%H:%M:%S')}]",
+                "url": f"https://bsky.app/profile/sciencepulse.bsky.social/post/{int(now_utc.timestamp())}",
                 "content": "High-temperature superconducting magnets reach steady plasma containment milestone.",
-                "published_at": datetime.datetime.utcnow(),
+                "published_at": now_utc,
                 "author": "@sciencepulse.bsky.social"
             }
         ]
@@ -299,10 +304,10 @@ def ingest_social_firehose(limit_per_source: int = 5):
         # Simulated live Mastodon public timeline events
         mastodon_samples = [
             {
-                "title": f"Mastodon Timeline: Open source decentralized networks surge in active node deployments [{datetime.datetime.utcnow().strftime('%H:%M:%S')}]",
-                "url": f"https://mastodon.social/@fediverse/posts/{int(datetime.datetime.utcnow().timestamp())}",
+                "title": f"Mastodon Timeline: Open source decentralized networks surge in active node deployments [{now_utc.strftime('%H:%M:%S')}]",
+                "url": f"https://mastodon.social/@fediverse/posts/{int(now_utc.timestamp())}",
                 "content": "ActivityPub federation records exponential peer-to-peer traffic increases across global servers.",
-                "published_at": datetime.datetime.utcnow(),
+                "published_at": now_utc,
                 "author": "@fediverse@mastodon.social"
             }
         ]
