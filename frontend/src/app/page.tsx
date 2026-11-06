@@ -88,10 +88,12 @@ export default function Dashboard() {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalTopics, setTotalTopics] = useState<number>(0);
   const [isOffline, setIsOffline] = useState<boolean>(false);
+  const [bookmarkedIds, setBookmarkedIds] = useState<number[]>([]);
+  const [showOnlyBookmarks, setShowOnlyBookmarks] = useState<boolean>(false);
 
   const categories = ["All", "General", "Technology", "Business", "Politics", "Science", "Entertainment"];
 
-  // Register PWA service worker & online/offline listener
+  // Register PWA service worker, online/offline listener, and load bookmarks
   useEffect(() => {
     if (typeof window !== "undefined") {
       setIsOffline(!navigator.onLine);
@@ -99,6 +101,13 @@ export default function Dashboard() {
       const handleOffline = () => setIsOffline(true);
       window.addEventListener("online", handleOnline);
       window.addEventListener("offline", handleOffline);
+
+      try {
+        const saved = localStorage.getItem("omnifeed_bookmarks");
+        if (saved) {
+          setBookmarkedIds(JSON.parse(saved));
+        }
+      } catch (_) {}
 
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("/sw.js").catch((err) => {
@@ -111,6 +120,17 @@ export default function Dashboard() {
       };
     }
   }, []);
+
+  const toggleBookmark = (id: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setBookmarkedIds((prev) => {
+      const updated = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
+      try {
+        localStorage.setItem("omnifeed_bookmarks", JSON.stringify(updated));
+      } catch (_) {}
+      return updated;
+    });
+  };
 
   // Fetch initial telemetry and pulse + live WebSocket connection
   useEffect(() => {
@@ -476,14 +496,29 @@ export default function Dashboard() {
             />
           </div>
 
-          {/* Category Tabs */}
+          {/* Category Tabs & Bookmarks */}
           <div className="flex items-center space-x-1 overflow-x-auto pb-1 md:pb-0">
+            <button
+              onClick={() => setShowOnlyBookmarks(!showOnlyBookmarks)}
+              title="Filter to bookmarked topics stored in local client memory"
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap flex items-center space-x-1 border ${
+                showOnlyBookmarks
+                  ? "bg-amber-500 text-slate-950 border-amber-400"
+                  : "bg-slate-800/80 text-amber-400 border-slate-700 hover:bg-slate-800"
+              }`}
+            >
+              <span>★ Bookmarks</span>
+              <span className="text-[10px] px-1 py-0.2 rounded-full bg-slate-900/40">{bookmarkedIds.length}</span>
+            </button>
             {categories.map((cat) => (
               <button
                 key={cat}
-                onClick={() => setActiveCategory(cat)}
+                onClick={() => {
+                  setActiveCategory(cat);
+                  setShowOnlyBookmarks(false);
+                }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition whitespace-nowrap ${
-                  activeCategory === cat
+                  !showOnlyBookmarks && activeCategory === cat
                     ? "bg-cyan-600 text-white"
                     : "bg-slate-800/60 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
                 }`}
@@ -532,43 +567,61 @@ export default function Dashboard() {
             <div className="text-center py-12 text-slate-500 text-sm animate-pulse">
               Loading clustered intelligence feeds...
             </div>
-          ) : topics.length === 0 ? (
+          ) : (showOnlyBookmarks ? topics.filter((t) => bookmarkedIds.includes(t.id)) : topics).length === 0 ? (
             <div className="text-center py-12 border border-dashed border-slate-800 rounded-xl text-slate-500 text-sm">
-              No matching topic clusters found. Try hitting ⚡ Sync Ingestion.
+              {showOnlyBookmarks
+                ? "No bookmarked topics found. Bookmark topics to read offline anytime!"
+                : "No matching topic clusters found. Try hitting ⚡ Sync Ingestion."}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {topics.map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => setSelectedTopicId(t.id)}
-                  className="bg-slate-900 border border-slate-800 hover:border-cyan-500/50 rounded-xl p-4 flex flex-col justify-between transition cursor-pointer group shadow-sm hover:shadow-cyan-950/20"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-cyan-400">
-                        {t.category || "General"}
-                      </span>
-                      <span className="text-[11px] text-slate-500">
-                        {t.article_count} {t.article_count === 1 ? "source" : "sources"}
-                      </span>
+              {(showOnlyBookmarks ? topics.filter((t) => bookmarkedIds.includes(t.id)) : topics).map((t) => {
+                const isBookmarked = bookmarkedIds.includes(t.id);
+                return (
+                  <div
+                    key={t.id}
+                    onClick={() => setSelectedTopicId(t.id)}
+                    className="bg-slate-900 border border-slate-800 hover:border-cyan-500/50 rounded-xl p-4 flex flex-col justify-between transition cursor-pointer group shadow-sm hover:shadow-cyan-950/20 relative"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-cyan-400">
+                          {t.category || "General"}
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={(e) => toggleBookmark(t.id, e)}
+                            title={isBookmarked ? "Remove bookmark" : "Bookmark topic for offline reading"}
+                            className={`text-xs px-1.5 py-0.5 rounded border transition ${
+                              isBookmarked
+                                ? "bg-amber-950/80 text-amber-300 border-amber-700/80"
+                                : "text-slate-500 hover:text-amber-400 border-slate-800 hover:border-slate-700"
+                            }`}
+                          >
+                            {isBookmarked ? "★" : "☆"}
+                          </button>
+                          <span className="text-[11px] text-slate-500">
+                            {t.article_count} {t.article_count === 1 ? "source" : "sources"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <h3 className="font-semibold text-slate-100 text-sm group-hover:text-cyan-300 transition line-clamp-2">
+                        {t.title}
+                      </h3>
+
+                      <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed">
+                        {t.summary}
+                      </p>
                     </div>
 
-                    <h3 className="font-semibold text-slate-100 text-sm group-hover:text-cyan-300 transition line-clamp-2">
-                      {t.title}
-                    </h3>
-
-                    <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed">
-                      {t.summary}
-                    </p>
+                    <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
+                      <span>Deep-dive cluster →</span>
+                      <span>{t.last_updated ? new Date(t.last_updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recent"}</span>
+                    </div>
                   </div>
-
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
-                    <span>Deep-dive cluster →</span>
-                    <span>{t.last_updated ? new Date(t.last_updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recent"}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -617,9 +670,21 @@ export default function Dashboard() {
             {topicDetail ? (
               <>
                 <div className="space-y-2 pr-10">
-                  <span className="text-xs font-bold uppercase px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800">
-                    {topicDetail.topic.category}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-bold uppercase px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800">
+                      {topicDetail.topic.category}
+                    </span>
+                    <button
+                      onClick={() => toggleBookmark(topicDetail.topic.id)}
+                      className={`text-xs px-2.5 py-0.5 rounded border transition flex items-center space-x-1 ${
+                        bookmarkedIds.includes(topicDetail.topic.id)
+                          ? "bg-amber-950 text-amber-300 border-amber-700 font-semibold"
+                          : "bg-slate-800 text-slate-400 border-slate-700 hover:text-amber-400"
+                      }`}
+                    >
+                      <span>{bookmarkedIds.includes(topicDetail.topic.id) ? "★ Bookmarked" : "☆ Bookmark Topic"}</span>
+                    </button>
+                  </div>
                   <h2 className="text-lg font-bold text-slate-100">
                     {topicDetail.topic.title}
                   </h2>

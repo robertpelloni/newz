@@ -2,6 +2,13 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.5.8] - 2026-10-24
+### Added
+- Client-side topic bookmarking and offline persistence: star bookmark toggle buttons on topic cards, in-modal bookmarking actions, and automatic localStorage synchronization (`omnifeed_bookmarks`).
+- Interactive "★ Bookmarks" category filter button with real-time bookmarked count badge for zero-friction access to saved clusters.
+- Verified persistent state across reloads and offline caching with Playwright headless test and screenshot validation.
+- All 14 backend unit and integration tests passing.
+
 ## [0.5.7] - 2026-10-24
 ### Added
 - Upgraded `frontend/public/sw.js` with dedicated `omnifeed-api-v2` cache bucket using Network-First with Cache Fallback for all `/api/` GET requests.
