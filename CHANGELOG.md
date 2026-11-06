@@ -2,6 +2,15 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.6.1] - 2026-10-24
+### Added
+- Multi-runtime platform detection chip in navigation bar dynamically resolving `Desktop (Tauri)`, `PWA`, or `Web` based on browser capabilities and window bindings.
+- Client-side persistent offline sync queue (`omnifeed_sync_queue`) stored in localStorage when disconnected from the backend.
+- Dynamic "⚡ Queue Sync" action button with pulsing counter badge displaying pending synchronization operations while offline.
+- Automated queue flush and ingestion execution upon network reconnection.
+- Verified offline queuing, visual indicators, and headless interactions via Playwright test suite.
+- All 14 backend unit and integration tests passing.
+
 ## [0.6.0] - 2026-10-24
 ### Added
 - Resilient WebSocket streaming with exponential backoff automatic reconnection (1s scaling to 16s) in `frontend/src/app/page.tsx`.

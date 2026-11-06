@@ -91,14 +91,57 @@ export default function Dashboard() {
   const [isOffline, setIsOffline] = useState<boolean>(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<number[]>([]);
   const [showOnlyBookmarks, setShowOnlyBookmarks] = useState<boolean>(false);
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
+  const [platformName, setPlatformName] = useState<string>("Web");
 
   const categories = ["All", "General", "Technology", "Business", "Politics", "Science", "Entertainment"];
 
-  // Register PWA service worker, online/offline listener, and load bookmarks
+  // Register PWA service worker, online/offline listener, offline sync replay, and load bookmarks
   useEffect(() => {
     if (typeof window !== "undefined") {
+      // Platform detection: Tauri window object or PWA standalone mode
+      if ((window as unknown as { __TAURI__?: unknown }).__TAURI__) {
+        setPlatformName("Desktop");
+      } else if (window.matchMedia("(display-mode: standalone)").matches) {
+        setPlatformName("PWA");
+      } else {
+        setPlatformName("Web");
+      }
+
       setIsOffline(!navigator.onLine);
-      const handleOnline = () => setIsOffline(false);
+
+      // Check pending offline sync actions queue
+      const checkSyncQueue = () => {
+        try {
+          const queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+          setPendingSyncCount(queue.length);
+        } catch (_) {}
+      };
+      checkSyncQueue();
+
+      const replayOfflineQueue = async () => {
+        setIsOffline(false);
+        try {
+          const queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+          if (queue.length > 0) {
+            setLiveAlert(`Replaying ${queue.length} offline queued actions...`);
+            for (const action of queue) {
+              if (action.type === "sync_feeds") {
+                await fetch(`${API_BASE}/api/actions/sync`, { method: "POST" }).catch(() => {});
+              }
+            }
+            localStorage.removeItem("omnifeed_sync_queue");
+            setPendingSyncCount(0);
+            fetchSystemData();
+            fetchTopics();
+            setTimeout(() => setLiveAlert(null), 3000);
+          }
+        } catch (e) {
+          console.error("Queue replay error:", e);
+        }
+      };
+
+      const handleOnline = () => replayOfflineQueue();
       const handleOffline = () => setIsOffline(true);
       window.addEventListener("online", handleOnline);
       window.addEventListener("offline", handleOffline);
@@ -297,11 +340,27 @@ export default function Dashboard() {
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      await fetch(`${API_BASE}/api/actions/sync`, { method: "POST" });
-      await fetchSystemData();
-      await fetchTopics();
+      if (isOffline) {
+        // Queue action for offline replay
+        const queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+        queue.push({ type: "sync_feeds", timestamp: new Date().toISOString() });
+        localStorage.setItem("omnifeed_sync_queue", JSON.stringify(queue));
+        setPendingSyncCount(queue.length);
+        setLiveAlert("Offline: Ingestion sync queued to execute once back online.");
+        setTimeout(() => setLiveAlert(null), 3000);
+      } else {
+        await fetch(`${API_BASE}/api/actions/sync`, { method: "POST" });
+        await fetchSystemData();
+        await fetchTopics();
+      }
     } catch (e) {
       console.error("Sync error:", e);
+      const queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+      queue.push({ type: "sync_feeds", timestamp: new Date().toISOString() });
+      localStorage.setItem("omnifeed_sync_queue", JSON.stringify(queue));
+      setPendingSyncCount(queue.length);
+      setLiveAlert("Network failure: Ingestion sync queued for background retry.");
+      setTimeout(() => setLiveAlert(null), 3000);
     } finally {
       setIsSyncing(false);
     }
@@ -408,7 +467,13 @@ export default function Dashboard() {
           <div className="flex items-center space-x-2">
             <span className="text-xl font-black tracking-wider text-cyan-400">OMNIFEED</span>
             <span className="text-xs uppercase px-2 py-0.5 font-bold bg-cyan-950 text-cyan-400 border border-cyan-800 rounded">
-              v{status?.version || "0.3.0"}
+              v{status?.version || "0.6.0"}
+            </span>
+            <span
+              title={`Runtime environment: ${platformName} build`}
+              className="text-[10px] uppercase px-1.5 py-0.5 font-semibold bg-slate-800 text-slate-300 border border-slate-700 rounded"
+            >
+              {platformName}
             </span>
           </div>
           <span className="text-xs text-slate-400 border-l border-slate-700 pl-4 hidden md:inline">
@@ -509,10 +574,22 @@ export default function Dashboard() {
           <button
             onClick={handleSync}
             disabled={isSyncing}
-            title="Fetch breaking stories from all sources and update clusters"
-            className="flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white rounded transition shadow disabled:opacity-50"
+            title={
+              isOffline
+                ? "Offline mode: Queues ingestion sync request to execute immediately when connectivity is restored"
+                : "Fetch breaking stories from all sources and update clusters"
+            }
+            className="flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white rounded transition shadow disabled:opacity-50 relative"
           >
-            <span>{isSyncing ? "⚡ Syncing Feeds..." : "⚡ Sync Ingestion"}</span>
+            <span>{isSyncing ? "⚡ Syncing Feeds..." : isOffline ? "⚡ Queue Sync" : "⚡ Sync Ingestion"}</span>
+            {pendingSyncCount > 0 && (
+              <span
+                title={`${pendingSyncCount} action(s) queued for replay upon reconnection`}
+                className="ml-1 bg-amber-400 text-slate-950 text-[10px] font-black px-1.5 py-0.2 rounded-full animate-bounce"
+              >
+                {pendingSyncCount}
+              </span>
+            )}
           </button>
 
           <button
