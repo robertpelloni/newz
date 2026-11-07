@@ -198,9 +198,22 @@ export default function Dashboard() {
       } catch (_) {}
 
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("/sw.js").catch((err) => {
-          console.warn("Service worker registration failed:", err);
-        });
+        navigator.serviceWorker
+          .register("/sw.js")
+          .then((registration) => {
+            // Listen for messages from service worker (e.g., background sync trigger)
+            navigator.serviceWorker.addEventListener("message", (event) => {
+              if (event.data?.type === "TRIGGER_QUEUE_REPLAY") {
+                replayOfflineQueue();
+              } else if (event.data?.type === "BACKGROUND_SYNC_COMPLETED") {
+                fetchSystemData();
+                fetchTopics();
+              }
+            });
+          })
+          .catch((err) => {
+            console.warn("Service worker registration failed:", err);
+          });
       }
       return () => {
         window.removeEventListener("online", handleOnline);
@@ -488,6 +501,16 @@ export default function Dashboard() {
         queue.push({ type: "sync_feeds", timestamp: new Date().toISOString() });
         localStorage.setItem("omnifeed_sync_queue", JSON.stringify(queue));
         setPendingSyncCount(queue.length);
+
+        // Register Background Sync if supported
+        if ("serviceWorker" in navigator && "SyncManager" in window) {
+          navigator.serviceWorker.ready.then((reg: any) => {
+            if (reg.sync) {
+              reg.sync.register("sync-omnifeed-queue").catch(() => {});
+            }
+          }).catch(() => {});
+        }
+
         setLiveAlert("Offline: Ingestion sync queued to execute once back online.");
         setTimeout(() => setLiveAlert(null), 3000);
       } else {

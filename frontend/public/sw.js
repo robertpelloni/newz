@@ -1,9 +1,11 @@
-const STATIC_CACHE = 'omnifeed-static-v2';
-const API_CACHE = 'omnifeed-api-v2';
+const STATIC_CACHE = 'omnifeed-static-v3';
+const API_CACHE = 'omnifeed-api-v3';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
-  '/favicon.ico'
+  '/favicon.ico',
+  '/icon-192.png',
+  '/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -19,11 +21,63 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== STATIC_CACHE && key !== API_CACHE).map((key) => caches.delete(key))
+        keys
+          .filter((key) => key !== STATIC_CACHE && key !== API_CACHE)
+          .map((key) => caches.delete(key))
       );
     })
   );
   self.clients.claim();
+});
+
+// Client communication and cache management commands
+self.addEventListener('message', (event) => {
+  if (!event.data) return;
+
+  if (event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+
+  if (event.data.type === 'PURGE_EXPIRED_CACHES') {
+    event.waitUntil(
+      caches.keys().then((keys) => {
+        return Promise.all(
+          keys
+            .filter((key) => key !== STATIC_CACHE && key !== API_CACHE)
+            .map((key) => caches.delete(key))
+        );
+      })
+    );
+  }
+
+  if (event.data.type === 'NOTIFY_SYNC_COMPLETE') {
+    self.clients.matchAll().then((clients) => {
+      clients.forEach((client) => {
+        client.postMessage({
+          type: 'BACKGROUND_SYNC_COMPLETED',
+          timestamp: new Date().toISOString()
+        });
+      });
+    });
+  }
+});
+
+// Background Sync coordination
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sync-omnifeed-queue') {
+    event.waitUntil(
+      self.clients.matchAll().then((clients) => {
+        // Inform active windows that background sync was invoked by browser
+        clients.forEach((client) => {
+          client.postMessage({
+            type: 'TRIGGER_QUEUE_REPLAY',
+            tag: event.tag,
+            timestamp: new Date().toISOString()
+          });
+        });
+      })
+    );
+  }
 });
 
 self.addEventListener('fetch', (event) => {
@@ -48,7 +102,7 @@ self.addEventListener('fetch', (event) => {
         .catch(() => {
           return caches.match(event.request).then((cachedResponse) => {
             if (cachedResponse) return cachedResponse;
-            // Return empty fallback response for graceful degradation
+            // Return empty fallback response for graceful offline degradation
             return new Response(JSON.stringify({ items: [], offline: true }), {
               headers: { 'Content-Type': 'application/json' }
             });

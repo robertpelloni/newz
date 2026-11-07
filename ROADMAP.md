@@ -37,5 +37,6 @@
 - [x] Dynamic custom RSS/Atom feed source subscription and registry management (v0.6.7).
 - [x] Automated custom feed ingestion pipeline and per-source article productivity diagnostics (v0.6.8).
 - [x] Real-time WebSocket streaming optimization with delta payload streaming and instant live state merging (v0.6.9).
+- [x] Service Worker Background Sync (`sync-omnifeed-queue`) and PWA distribution build finalization (v0.7.0).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

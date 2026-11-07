@@ -49,7 +49,8 @@ npm run tauri:build # For release binaries
 ```
 
 ### 3. Offline Architecture & Sync Mechanics
-- **API Cache Layer:** `sw.js` caches all `/api/` GET requests using a Network-First, Cache-Fallback strategy.
-- **LocalStorage Fallback:** Feed topics and user bookmarks are automatically mirrored into `omnifeed_cached_topics` and `omnifeed_bookmarks`.
-- **Offline Sync Queue:** Ingestion requests triggered while disconnected are queued into `omnifeed_sync_queue` and replayed automatically upon network reconnection.
+- **API Cache Layer:** `sw.js` caches all `/api/` GET requests using a Network-First, Cache-Fallback strategy into bucket `omnifeed-api-v3`.
+- **LocalStorage Fallback:** Feed topics, custom feed catalogue, individual topic cluster deep-dives, and user bookmarks are automatically mirrored into `omnifeed_cached_topics`, `omnifeed_sources_cache`, `omnifeed_topic_detail_<id>`, and `omnifeed_bookmarks`.
+- **Background Sync & Offline Queue:** Ingestion sync requests triggered while disconnected are queued into `omnifeed_sync_queue`. The application registers a Service Worker Background Sync event (`sync-omnifeed-queue`) which triggers automated queue replay when network connectivity is re-established, backed by window `online` listeners for browsers lacking the SyncManager API.
+- **Service Worker Messaging:** The service worker coordinates state updates via `TRIGGER_QUEUE_REPLAY` and `BACKGROUND_SYNC_COMPLETED` messages, prompting automatic dashboard refresh without user intervention.
 - **Platform Detection:** The dashboard identifies whether it is running as a Tauri desktop shell (`window.__TAURI__`), an installed PWA (`display-mode: standalone`), or standard web browser.

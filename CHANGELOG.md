@@ -2,6 +2,15 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.7.0] - 2026-10-24
+### Added
+- Upgraded Service Worker (`frontend/public/sw.js`) to cache buckets `omnifeed-static-v3` and `omnifeed-api-v3`.
+- Implemented Service Worker Background Sync (`sync-omnifeed-queue`) and duplex client messaging handlers (`TRIGGER_QUEUE_REPLAY`, `BACKGROUND_SYNC_COMPLETED`, `SKIP_WAITING`, `PURGE_EXPIRED_CACHES`).
+- Enhanced client-side service worker hooks in `frontend/src/app/page.tsx` registering `sync-omnifeed-queue` when queuing actions while disconnected.
+- Enhanced PWA validation script (`scripts/validate_pwa.py`) checking Background Sync handlers, message dispatchers, and manifest compliance.
+- Updated `DEPLOY.md`, `README.md`, and `VISION.md` with complete documentation for offline data synchronization.
+- Verified PWA offline sync workflow via Playwright (`verify_pwa_sync.py`), offline distribution build (`scripts/build_offline_distribution.sh`), and 15/15 passing backend unit tests.
+
 ## [0.6.9] - 2026-10-24
 ### Added
 - Optimized WebSocket broadcast streaming in `backend/main.py` with delta updates (`recent_topics`), live telemetry counts, and sentiment metrics delivered directly over the active socket.
