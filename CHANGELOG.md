@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.7.7] - 2026-11-07
+### Added
+- Offline topic filtering and full-text keyword search directly executed over the IndexedDB persistent cache.
+- Heuristic offline AI bullet briefing synthesis in `handleSummarize()`, allowing immediate cluster summaries when disconnected and saving updates to the local IndexedDB vault.
+- Extended automated Playwright test suite in `scripts/test_offline_data_access.py` validating offline search queries and result rendering.
+
 ## [0.7.6] - 2026-11-07
 ### Added
 - Multi-action offline synchronization queue supporting `add_feed`, `delete_feed`, and `sync_feeds` actions with optimistic UI feedback.

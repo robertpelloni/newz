@@ -48,3 +48,4 @@
 - [x] Implement bi-directional WebSocket telemetry snapshots and continuous client-side IndexedDB ingestion syncing (v0.7.4).
 - [x] Refine Tauri native desktop integration with dynamic versioning and multi-runtime detection (v0.7.5).
 - [x] Multi-action offline queue and manual modal replay controls (v0.7.6).
+- [x] Offline IndexedDB client search, filtering, and heuristic AI briefing synthesis (v0.7.7).

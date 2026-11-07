@@ -542,6 +542,11 @@ export default function Dashboard() {
   const fetchTopics = async () => {
     setLoading(true);
     try {
+      // If client is already offline, immediately bypass network and serve from IndexedDB/localStorage
+      if (isOffline) {
+        throw new Error("Offline mode active");
+      }
+
       const url = new URL(`${API_BASE}/api/topics`);
       url.searchParams.append("page", page.toString());
       url.searchParams.append("page_size", pageSize.toString());
@@ -551,6 +556,10 @@ export default function Dashboard() {
       const res = await fetch(url.toString());
       if (res.ok) {
         const data = await res.json();
+        if (data.offline) {
+          // Service worker returned offline fallback token
+          throw new Error("Service worker reported offline");
+        }
         // Support both paginated object and legacy array format
         if (data.items) {
           setTopics(data.items);
@@ -571,26 +580,49 @@ export default function Dashboard() {
         }
       }
     } catch (e) {
-      console.error("Error fetching topics:", e);
-      // Seamless offline recovery: load last cached topics from localStorage, then IndexedDB
+      // Seamless offline recovery: load cached topics from IndexedDB / localStorage with client-side filtering
       try {
-        const cached = localStorage.getItem("omnifeed_cached_topics");
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed.items && parsed.items.length > 0) {
-            setTopics(parsed.items);
-            setTotalTopics(parsed.total || parsed.items.length);
-            setTotalPages(parsed.total_pages || 1);
-          }
+        let pool: Topic[] = [];
+        const idbTopics = await getTopicsFromIndexedDB();
+        if (idbTopics && idbTopics.length > 0) {
+          pool = idbTopics;
         } else {
-          const idbTopics = await getTopicsFromIndexedDB();
-          if (idbTopics && idbTopics.length > 0) {
-            setTopics(idbTopics);
-            setTotalTopics(idbTopics.length);
-            setTotalPages(Math.ceil(idbTopics.length / pageSize) || 1);
+          const cached = localStorage.getItem("omnifeed_cached_topics");
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            pool = parsed.items || (Array.isArray(parsed) ? parsed : []);
           }
         }
-      } catch (_) {}
+
+        // Apply offline category filter
+        let filtered = pool;
+        if (activeCategory !== "All") {
+          filtered = filtered.filter(
+            (t) => t.category && t.category.toLowerCase() === activeCategory.toLowerCase()
+          );
+        }
+
+        // Apply offline search query filter
+        const q = searchQuery.trim().toLowerCase();
+        if (q) {
+          filtered = filtered.filter(
+            (t) =>
+              (t.title && t.title.toLowerCase().includes(q)) ||
+              (t.summary && t.summary.toLowerCase().includes(q))
+          );
+        }
+
+        const total = filtered.length;
+        const totalP = Math.max(1, Math.ceil(total / pageSize));
+        const offset = (page - 1) * pageSize;
+        const paginated = filtered.slice(offset, offset + pageSize);
+
+        setTopics(paginated);
+        setTotalTopics(total);
+        setTotalPages(totalP);
+      } catch (err) {
+        console.error("Offline recovery error:", err);
+      }
     } finally {
       setLoading(false);
     }
@@ -703,17 +735,48 @@ export default function Dashboard() {
       if (res.ok) {
         const data = await res.json();
         if (topicDetail) {
-          setTopicDetail({
+          const updated = {
             ...topicDetail,
             topic: {
               ...topicDetail.topic,
-              summary: data.summary
-            }
-          });
+              summary: data.summary,
+            },
+          };
+          setTopicDetail(updated);
+          await saveTopicDetailToIndexedDB(selectedTopicId, updated).catch(() => {});
         }
+      } else {
+        throw new Error("Backend summarization unavailable");
       }
     } catch (e) {
-      console.error("Summarization error:", e);
+      console.warn("Summarization offline fallback triggered:", e);
+      // Offline fallback: synthesize bullet briefing directly from cached topic and articles
+      if (topicDetail) {
+        const t = topicDetail.topic;
+        const arts = topicDetail.articles || [];
+        const bullets: string[] = [];
+        if (t.title) bullets.push(`- Key event: ${t.title}`);
+        if (t.summary && t.summary !== t.title) bullets.push(`- Overview: ${t.summary}`);
+        if (arts.length > 0) {
+          const sources = Array.from(new Set(arts.map((a) => a.source_name || "Feed source"))).slice(0, 3);
+          bullets.push(`- Corroborated across ${arts.length} publications including ${sources.join(", ")}`);
+        }
+        if (t.entities && t.entities.length > 0) {
+          bullets.push(`- Associated entities: ${t.entities.slice(0, 5).join(", ")}`);
+        }
+        bullets.push(`- [Offline Intelligence Synthesis @ ${new Date().toLocaleTimeString()}]`);
+
+        const offlineSummary = bullets.join("\n");
+        const updated = {
+          ...topicDetail,
+          topic: {
+            ...topicDetail.topic,
+            summary: offlineSummary,
+          },
+        };
+        setTopicDetail(updated);
+        await saveTopicDetailToIndexedDB(selectedTopicId, updated).catch(() => {});
+      }
     } finally {
       setIsSummarizing(false);
     }
