@@ -242,3 +242,23 @@ def test_get_topics_multi_criteria_sorting():
                 assert items[0]["article_count"] >= items[1]["article_count"]
             elif sort_param == "controversy":
                 assert items[0]["controversy_score"] >= items[1]["controversy_score"]
+
+def test_autopilot_settings_lifecycle():
+    # 1. Get current status
+    res = client.get("/api/settings/autopilot")
+    assert res.status_code == 200
+    state = res.json()
+    assert "enabled" in state
+    assert "interval_seconds" in state
+
+    # 2. Toggle enabled to True
+    post_res = client.post("/api/settings/autopilot", json={"enabled": True, "interval_seconds": 45})
+    assert post_res.status_code == 200
+    updated = post_res.json()["autopilot"]
+    assert updated["enabled"] is True
+    assert updated["interval_seconds"] == 45
+
+    # 3. Toggle back to False
+    reset_res = client.post("/api/settings/autopilot", json={"enabled": False})
+    assert reset_res.status_code == 200
+    assert reset_res.json()["autopilot"]["enabled"] is False

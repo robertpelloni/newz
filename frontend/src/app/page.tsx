@@ -120,6 +120,7 @@ export default function Dashboard() {
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
   const [platformName, setPlatformName] = useState<string>("Web");
   const [audioAlertsEnabled, setAudioAlertsEnabled] = useState<boolean>(false);
+  const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(false);
 
   // Custom Feed Management State
   const [showFeedsModal, setShowFeedsModal] = useState<boolean>(false);
@@ -912,6 +913,32 @@ export default function Dashboard() {
               {wsConnected ? "Live WS" : wsReconnectAttempts > 0 ? `Reconnecting (${wsReconnectAttempts})` : "Polling"}
             </span>
           </div>
+
+          {/* Autopilot Ingestion Toggle */}
+          <button
+            onClick={async () => {
+              const nextState = !autopilotEnabled;
+              setAutopilotEnabled(nextState);
+              try {
+                await fetch(`${API_BASE}/api/settings/autopilot`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ enabled: nextState, interval_seconds: 60 }),
+                });
+                setLiveAlert(nextState ? "Autopilot automated background ingestion enabled." : "Autopilot paused.");
+                setTimeout(() => setLiveAlert(null), 3000);
+              } catch (_) {}
+            }}
+            title={autopilotEnabled ? "Autopilot Active: Background ingestion and clustering running automatically" : "Enable Autopilot: Automatically ingest feeds and stream deltas"}
+            className={`px-2.5 py-1.5 text-xs font-semibold rounded border transition flex items-center space-x-1.5 ${
+              autopilotEnabled
+                ? "bg-cyan-500/20 text-cyan-400 border-cyan-500/60 shadow-[0_0_10px_rgba(6,182,212,0.2)]"
+                : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
+            }`}
+          >
+            <span className={`inline-block w-1.5 h-1.5 rounded-full ${autopilotEnabled ? "bg-cyan-400 animate-ping" : "bg-slate-500"}`} />
+            <span>{autopilotEnabled ? "⚡ Autopilot On" : "⚡ Autopilot"}</span>
+          </button>
 
           {/* Audio Chime Alert Toggle */}
           <button

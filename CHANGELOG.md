@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.8.2] - 2026-11-07
+### Added
+- Autopilot background ingestion settings API (`GET` & `POST /api/settings/autopilot`) enabling automated dynamic scheduling and state inspection.
+- Interactive "⚡ Autopilot" toggle button in the dashboard navbar (`frontend/src/app/page.tsx`) with real-time status pulses and tooltips.
+- Automated unit test `test_autopilot_settings_lifecycle` in `backend/tests/test_api.py` (20/20 tests passing).
+
 ## [0.8.1] - 2026-11-07
 ### Added
 - Multi-criteria topic sorting in backend API (`GET /api/topics?sort_by=...`), supporting ordering by recent updates (`latest`), article volume (`articles`), controversy level (`controversy`), and sentiment extremity (`sentiment`).

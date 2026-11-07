@@ -583,6 +583,28 @@ async def trigger_firehose(db: Session = Depends(get_db)):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+# Autopilot background ingestion state
+autopilot_state = {
+    "enabled": False,
+    "interval_seconds": 60,
+    "last_run": None,
+    "run_count": 0
+}
+
+@app.get("/api/settings/autopilot")
+def get_autopilot_status():
+    """Query current autopilot automated ingestion status."""
+    return autopilot_state
+
+@app.post("/api/settings/autopilot")
+async def set_autopilot_status(payload: dict):
+    """Enable or disable periodic background ingestion."""
+    if "enabled" in payload:
+        autopilot_state["enabled"] = bool(payload["enabled"])
+    if "interval_seconds" in payload and isinstance(payload["interval_seconds"], (int, float)):
+        autopilot_state["interval_seconds"] = max(10, int(payload["interval_seconds"]))
+    return {"status": "success", "autopilot": autopilot_state}
+
 @app.post("/api/system/shutdown")
 def shutdown_system():
     """Gracefully terminate backend process."""
