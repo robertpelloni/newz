@@ -162,7 +162,11 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       // Platform detection: Tauri window object or PWA standalone mode
-      if ((window as unknown as { __TAURI__?: unknown }).__TAURI__) {
+      const w = window as unknown as {
+        __TAURI__?: unknown;
+        __TAURI_INTERNALS__?: unknown;
+      };
+      if (w.__TAURI__ || w.__TAURI_INTERNALS__) {
         setPlatformName("Desktop");
       } else if (window.matchMedia("(display-mode: standalone)").matches) {
         setPlatformName("PWA");

@@ -51,10 +51,12 @@ echo "4. Validating Tauri desktop configuration and icons..."
 cd "$REPO_ROOT"
 python3 -c "
 import json, os
+with open('VERSION.md', 'r') as vf:
+    expected_version = vf.read().strip()
 with open('frontend/src-tauri/tauri.conf.json', 'r') as f:
     conf = json.load(f)
 assert conf['productName'] == 'Omnifeed'
-assert conf['version'] == '0.7.2'
+assert conf['version'] == expected_version, f'Expected version {expected_version}, got {conf[\"version\"]}'
 assert os.path.exists('frontend/src-tauri/icons/icon.png')
 print('Tauri config valid: ' + conf['productName'] + ' v' + conf['version'])
 "

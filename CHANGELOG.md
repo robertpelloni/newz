@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.7.5] - 2026-11-07
+### Added
+- Native Tauri v2 desktop integration refinement with runtime `get_desktop_info` command handler and dynamic build version logging.
+- Enhanced cross-platform desktop runtime detection in `frontend/src/app/page.tsx` recognizing both `__TAURI__` and `__TAURI_INTERNALS__` objects.
+- Dynamically synchronized Tauri build validation in `scripts/build_offline_distribution.sh` matching single-source `VERSION.md`.
+
 ## [0.7.4] - 2026-11-07
 ### Added
 - Bi-directional WebSocket real-time streaming with immediate telemetry snapshots and topic delta delivery upon client connection handshake (`/api/ws/feed`).
