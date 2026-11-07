@@ -115,4 +115,17 @@ Omnifeed's architectural foundation is partitioned into three foundational subsy
 - `/backend`: FastAPI REST API, WebSocket streaming channel, SQLAlchemy ORM models, and database engine with SQLite fallback.
 - `/worker`: Tasks for feed ingestion, unsupervised clustering, sentiment scoring, and local LLM summarization.
 - `/frontend`: Next.js 15 React web dashboard with Tailwind CSS v4, PWA service worker, and Tauri v2 desktop integration (`frontend/src-tauri`).
-- `/scripts`: Standalone lifecycle controller and system tray daemon (`scripts/system_tray.py`).
+- `/scripts`: Standalone lifecycle controller, system tray daemon (`scripts/system_tray.py`), and offline distribution build tool (`scripts/build_offline_distribution.sh`).
+
+---
+
+## 4. Offline First & Cross-Platform Execution
+
+Omnifeed is designed from the ground up to operate reliably without continuous internet connectivity:
+
+- **Progressive Web App (PWA):** Equipped with `frontend/public/manifest.json` and `frontend/public/sw.js` (caching buckets `omnifeed-static-v3` and `omnifeed-api-v3`). Uses Stale-While-Revalidate caching for static frontend bundles and a Network-First, Cache-Fallback policy for `/api/` endpoints.
+- **Service Worker Background Sync:** Registers a background synchronization hook (`sync-omnifeed-queue`) to replay pending actions asynchronously via the Service Worker `sync` event handler, with duplex client messaging (`TRIGGER_QUEUE_REPLAY`, `BACKGROUND_SYNC_COMPLETED`).
+- **Client-Side Cache Redundancy:** Topic clusters, feed channel subscriptions, detailed cluster intelligence views, and reading list bookmarks automatically synchronize to browser `localStorage` (`omnifeed_cached_topics`, `omnifeed_sources_cache`, `omnifeed_topic_detail_<id>`, `omnifeed_bookmarks`), rendering feeds and deep-dives instantly even when disconnected.
+- **Offline Sync Queue:** If an ingestion sync is triggered while disconnected, the command is placed in `omnifeed_sync_queue`. The UI dynamically morphs the sync button into `⚡ Queue Sync` with pending count badges, automatically executing and flushing upon network recovery.
+- **Tauri v2 Desktop Native Shell:** Native OS wrapper with tray icon controls, system notification dispatch, and offline capabilities.
+- **Offline Distribution Build:** Run `./scripts/build_offline_distribution.sh` to validate manifest assets, compile production bundles, and verify service worker synchronization rules.

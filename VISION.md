@@ -13,4 +13,4 @@ Omnifeed is designed as the ultimate autonomous intelligence command center — 
    A single-page, responsive operations center with zero fragmented subpages. High-value data (sentiment polarity pulse, live wire badges, entity tags, discussion context) is immediately visible with interactive deep-dives, dual-direction pagination, and OLED contrast options.
 
 4. **Offline Resilience & Ubiquitous Distribution**:
-   Zero hard dependencies for local development (automatic SQLite fallback), coupled with cross-platform desktop shells (Tauri v2) and mobile-ready Progressive Web Apps (stale-while-revalidate offline caching).
+   Zero hard dependencies for local development (automatic SQLite fallback), coupled with cross-platform desktop shells (Tauri v2) and mobile-ready Progressive Web Apps (stale-while-revalidate offline caching, Service Worker Background Sync coordination, and offline sync queue replay).

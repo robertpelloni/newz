@@ -7,4 +7,5 @@ alembic
 pgvector
 pytest
 httpx
+requests
 pydantic

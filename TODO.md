@@ -27,3 +27,22 @@
 - [x] Enrich topic timeline tracking with chronologically sorted, rich correlation metadata and polarity indicators.
 - [x] Detail Deep Architectural Component Specifications in README.md.
 - [x] Refine Tauri v2 desktop application bundle (build.rs, icons, tauri::Builder) and offline UX banner.
+- [x] Upgrade Service Worker with dedicated API cache bucket (`omnifeed-api-v2`) and offline localStorage fallback for topic feeds (v0.5.7).
+- [x] Validate PWA offline operation via Playwright headless test and visual screenshot verification.
+- [x] Implement topic bookmarking, localStorage state persistence, and "★ Bookmarks" filter tab (v0.5.8).
+- [x] Implement Reading List Markdown and JSON export for offline briefs (v0.5.9).
+- [x] Implement WebSocket auto-reconnect with exponential backoff and indicator tooltips (v0.6.0).
+- [x] Multi-runtime platform detection (Tauri desktop / PWA / Web) and offline sync queue with automated replay (v0.6.1).
+- [x] Automated PWA offline distribution build script (`scripts/build_offline_distribution.sh`) and offline documentation (v0.6.2).
+- [x] End-to-end automated offline data access validation script (`scripts/test_offline_data_access.py`) and Tauri config v0.6.3 sync (v0.6.3).
+- [x] Category tag filtering for saved reading list bookmarks (v0.6.4).
+- [x] Breaking news controversy badges and Web Audio alert chimes (v0.6.5).
+- [x] Offline topic detail caching and seamless cluster deep-dive modal fallback (v0.6.6).
+- [x] Custom RSS feed subscription endpoint and dashboard feed management modal (v0.6.7).
+- [x] Automated custom feed ingestion pipeline and per-source article productivity diagnostics (v0.6.8).
+- [x] Real-time WebSocket streaming optimization with delta payload streaming and instant live state merging (v0.6.9).
+- [x] Finalize PWA build process, Service Worker Background Sync (`sync-omnifeed-queue`), and offline sync documentation (v0.7.0).
+- [x] Feed source health diagnostics and real-time endpoint latency probing (v0.7.1).
+- [x] Unified PWA and Tauri desktop offline bundle validation (v0.7.2).
+- [x] Implement IndexedDB offline intelligence vault and Offline Storage Governance modal with JSON vault export and cache purging (v0.7.3).
+- [x] Implement bi-directional WebSocket telemetry snapshots and continuous client-side IndexedDB ingestion syncing (v0.7.4).

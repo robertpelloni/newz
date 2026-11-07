@@ -75,22 +75,89 @@ def get_db():
     finally:
         db.close()
 
+def get_live_telemetry_snapshot(db: Session) -> dict:
+    """Helper to extract lightweight current system telemetry and recent topic deltas."""
+    art_count = db.query(models.Article).count()
+    top_count = db.query(models.Topic).count()
+    disc_count = db.query(models.Discussion).count()
+
+    # Calculate quick sentiment
+    sentiments = db.query(models.Sentiment).order_by(models.Sentiment.id.desc()).limit(50).all()
+    scores = [s.overall_score for s in sentiments if s.overall_score is not None]
+    avg_score = round(sum(scores) / len(scores), 2) if scores else 0.0
+
+    # Get 5 most recent topics
+    recent_topics = db.query(models.Topic).order_by(models.Topic.last_updated.desc()).limit(5).all()
+    recent_items = []
+    for t in recent_topics:
+        count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
+        latest_sentiment = db.query(models.Sentiment).filter(models.Sentiment.topic_id == t.id).order_by(models.Sentiment.id.desc()).first()
+        controversy = 0.0
+        sentiment = 0.0
+        if latest_sentiment and latest_sentiment.breakdown_json:
+            controversy = latest_sentiment.breakdown_json.get("controversy", 0.0)
+            sentiment = latest_sentiment.overall_score or 0.0
+        recent_items.append({
+            "id": t.id,
+            "title": t.title,
+            "summary": t.summary,
+            "category": t.category,
+            "first_seen": t.first_seen.isoformat() if t.first_seen else None,
+            "last_updated": t.last_updated.isoformat() if t.last_updated else None,
+            "article_count": count,
+            "controversy_score": round(controversy, 2),
+            "sentiment_score": round(sentiment, 2),
+            "is_breaking": (controversy >= 0.4 or count >= 15),
+        })
+
+    return {
+        "counts": {
+            "articles": art_count,
+            "topics": top_count,
+            "discussions": disc_count
+        },
+        "overall_sentiment": avg_score,
+        "recent_topics": recent_items
+    }
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Omnifeed API", "version": get_app_version()}
 
 @app.websocket("/api/ws/feed")
-async def websocket_feed_endpoint(websocket: WebSocket):
+async def websocket_feed_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
     """Real-time streaming channel for new topics, feed updates, and live alerts."""
     await manager.connect(websocket)
     try:
-        # Send initial handshake confirmation
-        await websocket.send_json({"event": "connected", "message": "Omnifeed live stream active"})
+        # Send initial handshake confirmation along with immediate telemetry snapshot
+        snapshot = get_live_telemetry_snapshot(db)
+        await websocket.send_json({
+            "event": "connected",
+            "message": "Omnifeed live stream active",
+            "telemetry": snapshot["counts"],
+            "overall_sentiment": snapshot["overall_sentiment"],
+            "recent_topics": snapshot["recent_topics"]
+        })
         while True:
-            # Keep connection alive and accept incoming pings or queries
-            data = await websocket.receive_text()
-            if data == "ping":
+            # Keep connection alive and accept incoming pings, actions, or telemetry requests
+            raw_data = await websocket.receive_text()
+            if raw_data == "ping":
                 await websocket.send_json({"event": "pong"})
+            else:
+                try:
+                    payload = json.loads(raw_data)
+                    action = payload.get("action")
+                    if action == "request_snapshot":
+                        curr_snapshot = get_live_telemetry_snapshot(db)
+                        await websocket.send_json({
+                            "event": "telemetry_snapshot",
+                            "telemetry": curr_snapshot["counts"],
+                            "overall_sentiment": curr_snapshot["overall_sentiment"],
+                            "recent_topics": curr_snapshot["recent_topics"]
+                        })
+                except Exception:
+                    # Ignore non-json raw text frames
+                    pass
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception:
@@ -119,16 +186,124 @@ def get_sources(db: Session = Depends(get_db)):
     """List all registered news and social feed sources."""
     sources = db.query(models.Source).all()
     if not sources:
-        # Default source catalogue
+        # Seed and return default catalogue if empty
         defaults = [
-            {"id": 1, "name": "Google News", "type": "mainstream", "url": "https://news.google.com/rss", "active": True},
-            {"id": 2, "name": "Yahoo News", "type": "mainstream", "url": "https://news.yahoo.com/rss", "active": True},
-            {"id": 3, "name": "Hacker News", "type": "aggregator", "url": "https://hacker-news.firebaseio.com/v0", "active": True},
-            {"id": 4, "name": "Reddit (r/news, r/tech)", "type": "social", "url": "https://reddit.com/r/news/.json", "active": True},
-            {"id": 5, "name": "MSN News", "type": "mainstream", "url": "https://rss.msn.com", "active": True},
+            {"name": "Google News", "type": "mainstream", "url": "https://news.google.com/rss"},
+            {"name": "Yahoo News", "type": "mainstream", "url": "https://news.yahoo.com/rss"},
+            {"name": "Hacker News", "type": "aggregator", "url": "https://hacker-news.firebaseio.com/v0"},
+            {"name": "Reddit (r/news, r/tech)", "type": "social", "url": "https://reddit.com/r/news/.json"},
+            {"name": "MSN News", "type": "mainstream", "url": "https://rss.msn.com"},
         ]
-        return defaults
-    return [{"id": s.id, "name": s.name, "type": s.type, "url": s.url, "active": True} for s in sources]
+        created = []
+        for d in defaults:
+            s = models.Source(name=d["name"], type=d["type"], url=d["url"])
+            db.add(s)
+            created.append(s)
+        try:
+            db.commit()
+            for s in created:
+                db.refresh(s)
+            return [{"id": s.id, "name": s.name, "type": s.type, "url": s.url, "active": True} for s in created]
+        except Exception:
+            db.rollback()
+            return [{"id": i + 1, "name": d["name"], "type": d["type"], "url": d["url"], "active": True} for i, d in enumerate(defaults)]
+
+    result = []
+    for s in sources:
+        art_count = db.query(models.Article).filter(models.Article.source_id == s.id).count()
+        result.append({
+            "id": s.id,
+            "name": s.name,
+            "type": s.type,
+            "url": s.url,
+            "active": True,
+            "article_count": art_count
+        })
+    return result
+
+@app.post("/api/sources", response_model=schemas.SourceResponse)
+def create_source(source_in: schemas.SourceCreate, db: Session = Depends(get_db)):
+    """Register a new custom RSS/Atom feed source."""
+    if not source_in.name.strip() or not source_in.url.strip():
+        raise HTTPException(status_code=400, detail="Name and URL are required.")
+
+    # Check for existing feed with same URL
+    existing = db.query(models.Source).filter(models.Source.url == source_in.url.strip()).first()
+    if existing:
+        art_count = db.query(models.Article).filter(models.Article.source_id == existing.id).count()
+        return {
+            "id": existing.id,
+            "name": existing.name,
+            "type": existing.type,
+            "url": existing.url,
+            "active": True,
+            "article_count": art_count
+        }
+
+    new_source = models.Source(
+        name=source_in.name.strip(),
+        type=source_in.type.strip() if source_in.type else "rss",
+        url=source_in.url.strip()
+    )
+    db.add(new_source)
+    db.commit()
+    db.refresh(new_source)
+    return {
+        "id": new_source.id,
+        "name": new_source.name,
+        "type": new_source.type,
+        "url": new_source.url,
+        "active": True,
+        "article_count": 0
+    }
+
+@app.delete("/api/sources/{source_id}")
+def delete_source(source_id: int, db: Session = Depends(get_db)):
+    """Remove a registered feed source."""
+    source = db.query(models.Source).filter(models.Source.id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Feed source not found.")
+    db.delete(source)
+    db.commit()
+    return {"status": "success", "message": f"Source {source_id} removed successfully."}
+
+@app.post("/api/sources/{source_id}/ping", response_model=schemas.SourcePingResponse)
+def ping_source(source_id: int, db: Session = Depends(get_db)):
+    """Probe feed source health and measure response latency."""
+    import time
+    import urllib.request
+    source = db.query(models.Source).filter(models.Source.id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Feed source not found.")
+
+    start_time = time.time()
+    try:
+        # Check endpoint latency with short timeout
+        req = urllib.request.Request(
+            source.url,
+            headers={"User-Agent": "Omnifeed-HealthCheck/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=4.0) as resp:
+            status_code = resp.getcode()
+            latency = (time.time() - start_time) * 1000.0
+            return {
+                "id": source.id,
+                "name": source.name,
+                "url": source.url,
+                "status": "healthy" if status_code < 400 else "degraded",
+                "latency_ms": round(latency, 1),
+                "http_code": status_code
+            }
+    except Exception as e:
+        latency = (time.time() - start_time) * 1000.0
+        return {
+            "id": source.id,
+            "name": source.name,
+            "url": source.url,
+            "status": "unreachable",
+            "latency_ms": round(latency, 1),
+            "http_code": None
+        }
 
 @app.get("/api/topics")
 def get_topics(
@@ -155,6 +330,14 @@ def get_topics(
     items = []
     for t in topics:
         article_count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
+        # Query latest sentiment score/controversy
+        latest_sentiment = db.query(models.Sentiment).filter(models.Sentiment.topic_id == t.id).order_by(models.Sentiment.id.desc()).first()
+        controversy_score = 0.0
+        sentiment_score = 0.0
+        if latest_sentiment and latest_sentiment.breakdown_json:
+            controversy_score = latest_sentiment.breakdown_json.get("controversy", 0.0)
+            sentiment_score = latest_sentiment.overall_score or 0.0
+
         items.append({
             "id": t.id,
             "title": t.title,
@@ -163,6 +346,9 @@ def get_topics(
             "first_seen": t.first_seen.isoformat() if t.first_seen else None,
             "last_updated": t.last_updated.isoformat() if t.last_updated else None,
             "article_count": article_count,
+            "controversy_score": round(controversy_score, 2),
+            "sentiment_score": round(sentiment_score, 2),
+            "is_breaking": (controversy_score >= 0.4 or article_count >= 15),
         })
 
     return {
@@ -321,32 +507,40 @@ def get_sentiment_pulse(db: Session = Depends(get_db)):
     }
 
 @app.post("/api/actions/sync")
-async def trigger_sync():
-    """Trigger background ingestion and clustering and broadcast notification."""
+async def trigger_sync(db: Session = Depends(get_db)):
+    """Trigger background ingestion and clustering and broadcast optimized notification."""
     try:
         from worker.tasks import run_pipeline_standalone
         count = run_pipeline_standalone()
+        snapshot = get_live_telemetry_snapshot(db)
         await manager.broadcast({
             "event": "sync_completed",
             "synced_articles": count,
-            "message": f"Successfully ingested and clustered {count} items."
+            "message": f"Successfully ingested and clustered {count} items.",
+            "telemetry": snapshot["counts"],
+            "overall_sentiment": snapshot["overall_sentiment"],
+            "recent_topics": snapshot["recent_topics"]
         })
-        return {"status": "success", "synced_articles": count}
+        return {"status": "success", "synced_articles": count, "telemetry": snapshot["counts"]}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 @app.post("/api/firehose/simulate")
-async def trigger_firehose():
+async def trigger_firehose(db: Session = Depends(get_db)):
     """Ingest simulated real-time micro-commentary from Bluesky Jetstream & Mastodon Fediverse."""
     try:
         from worker.tasks import ingest_social_firehose
         count = ingest_social_firehose()
+        snapshot = get_live_telemetry_snapshot(db)
         await manager.broadcast({
             "event": "firehose_pulse",
             "ingested_events": count,
-            "message": f"Live Firehose: Streamed {count} micro-commentary events from Bluesky & Mastodon."
+            "message": f"Live Firehose: Streamed {count} micro-commentary events from Bluesky & Mastodon.",
+            "telemetry": snapshot["counts"],
+            "overall_sentiment": snapshot["overall_sentiment"],
+            "recent_topics": snapshot["recent_topics"]
         })
-        return {"status": "success", "ingested_events": count}
+        return {"status": "success", "ingested_events": count, "telemetry": snapshot["counts"]}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 

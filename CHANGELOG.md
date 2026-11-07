@@ -2,6 +2,143 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.7.4] - 2026-11-07
+### Added
+- Bi-directional WebSocket real-time streaming with immediate telemetry snapshots and topic delta delivery upon client connection handshake (`/api/ws/feed`).
+- Interactive WebSocket client commands supporting `{"action": "request_snapshot"}` for on-demand live state retrieval.
+- Automated client-side IndexedDB synchronization on live WebSocket delta events, keeping the offline intelligence vault continuously primed with incoming stories.
+- Automated backend unit test `test_websocket_immediate_snapshot_and_request_action` validating WebSocket handshake, payload structure, and client request actions.
+
+## [0.7.3] - 2026-11-07
+### Added
+- Client-side IndexedDB persistent storage vault (`frontend/src/utils/offlineStore.ts`) providing robust offline storage for clustered topics, detailed articles, and storage telemetry metrics.
+- Interactive Offline Storage & Cache Manager modal accessible via the navigation header (`💾 Cache`), displaying stored topic counts, deep-dive detail counts, estimated byte footprint, and pending background sync queues.
+- Offline Vault JSON archive export capability, enabling offline backups and data portability even in fully air-gapped environments.
+- Selective offline cache purging and real-time storage metrics recalculation.
+- Enhanced Playwright automated offline verification suite in `scripts/test_offline_data_access.py` testing IndexedDB record counts and modal interactions.
+
+## [0.7.2] - 2026-10-24
+### Added
+- Synchronized Tauri desktop configuration bundle version to v0.7.2 in `frontend/src-tauri/tauri.conf.json`.
+- Enhanced `scripts/build_offline_distribution.sh` with automated schema, version, and icon validation for Tauri v2 native desktop builds.
+- Refined cross-platform runtime indicator badge in `frontend/src/app/page.tsx` with offline capability and sync queue guidance.
+- Verified offline caching and queue operations across PWA and desktop configurations via Playwright test suite (`verify_platform_offline.py` and `scripts/test_offline_data_access.py`).
+- All 16 backend unit and integration tests passing.
+
+## [0.7.1] - 2026-10-24
+### Added
+- Feed Source Health Diagnostics & Latency Probing endpoint `POST /api/sources/{id}/ping` in `backend/main.py`.
+- Response schemas `SourcePingResponse` and health metadata attributes (`status`, `latency_ms`) in `backend/schemas.py`.
+- Interactive "⚡ Ping" action button on feed cards with real-time health indicator chips (`● healthy (<latency>ms)`) in `frontend/src/app/page.tsx`.
+- Automated test `test_feed_source_health_ping` in `backend/tests/test_api.py` (16/16 backend tests passing).
+- Verified feed health probe visual interactions via Playwright test (`verify_feed_ping.py`).
+
+## [0.7.0] - 2026-10-24
+### Added
+- Upgraded Service Worker (`frontend/public/sw.js`) to cache buckets `omnifeed-static-v3` and `omnifeed-api-v3`.
+- Implemented Service Worker Background Sync (`sync-omnifeed-queue`) and duplex client messaging handlers (`TRIGGER_QUEUE_REPLAY`, `BACKGROUND_SYNC_COMPLETED`, `SKIP_WAITING`, `PURGE_EXPIRED_CACHES`).
+- Enhanced client-side service worker hooks in `frontend/src/app/page.tsx` registering `sync-omnifeed-queue` when queuing actions while disconnected.
+- Enhanced PWA validation script (`scripts/validate_pwa.py`) checking Background Sync handlers, message dispatchers, and manifest compliance.
+- Updated `DEPLOY.md`, `README.md`, and `VISION.md` with complete documentation for offline data synchronization.
+- Verified PWA offline sync workflow via Playwright (`verify_pwa_sync.py`), offline distribution build (`scripts/build_offline_distribution.sh`), and 15/15 passing backend unit tests.
+
+## [0.6.9] - 2026-10-24
+### Added
+- Optimized WebSocket broadcast streaming in `backend/main.py` with delta updates (`recent_topics`), live telemetry counts, and sentiment metrics delivered directly over the active socket.
+- Added live snapshot telemetry helper `get_live_telemetry_snapshot(db)` in `backend/main.py`.
+- Instantaneous client-side state merging in `frontend/src/app/page.tsx` directly inserting WebSocket topic deltas into page 1 clusters and updating telemetry counters without requiring full round-trip HTTP refetches.
+- Added automated unit test `test_websocket_optimized_broadcast_payload` in `backend/tests/test_api.py` (16/16 tests passing).
+- Verified WebSocket live broadcast streaming and instant UI updates via Playwright test suite (`verify_websocket_streaming_optimization.py`).
+
+## [0.6.8] - 2026-10-24
+### Added
+- Integrated custom subscribed feeds directly into ingestion and clustering pipeline in `worker/tasks.py`.
+- Added per-feed `article_count` productivity metrics in `GET /api/sources` and `backend/schemas.py`.
+- Displayed live article count badges on source cards in the dashboard Feed Management modal (`frontend/src/app/page.tsx`).
+- Updated unit test suite in `backend/tests/test_api.py` validating article count diagnostics (15/15 tests passing).
+- Verified UI diagnostics with Playwright test (`verify_feed_source_diagnostics.py`).
+
+## [0.6.7] - 2026-10-24
+### Added
+- Custom feed subscription endpoints (`POST /api/sources` and `DELETE /api/sources/{id}`) in `backend/main.py`.
+- Dynamic Feed Sources & Subscriptions modal dialog in `frontend/src/app/page.tsx` with category type dropdown, subscription form, real-time channel counts, and unsubscribe actions.
+- Local storage fallback for feed catalogue cache (`omnifeed_sources_cache`) during offline browsing.
+- Unit test `test_custom_feed_subscription_lifecycle` in `backend/tests/test_api.py` (15/15 tests passing).
+- Verified feed subscription workflow and modal UI via Playwright test (`verify_feed_subscription_modal.py`).
+
+## [0.6.6] - 2026-10-24
+### Added
+- Offline topic detail caching in `frontend/src/app/page.tsx`: automatically saves fetched topic intelligence clusters, extracted entities, correlated articles, and narrative timelines into `localStorage` (`omnifeed_topic_detail_<id>`).
+- Seamless offline modal viewing: clicking topic cluster cards while disconnected from the server falls back to locally cached cluster details with all narrative timelines and intelligence intact.
+- Verified offline topic modal rendering using Playwright test suite (`verify_offline_topic_detail_modal.py`) and visual screenshot inspection.
+- 14/14 backend unit/integration tests and automated offline access suite passing.
+
+## [0.6.5] - 2026-10-24
+### Added
+- Breaking news controversy indicators ("🔥 BREAKING") on high-controversy and high-velocity topic clusters.
+- Synthesized Web Audio API alert chime toggle ("🔔 Audio On" / "🔕 Audio") in dashboard header for instant auditory breaking alerts without external audio file dependencies.
+- Backend `/api/topics` endpoint enhanced with `controversy_score`, `sentiment_score`, and `is_breaking` boolean flags.
+- Verified breaking badges and audio toggle with Playwright test suite (`verify_breaking_alert_and_audio.py`).
+- All 14 backend unit/integration tests passing.
+
+## [0.6.4] - 2026-10-24
+### Added
+- Enhanced topic bookmark filtering with combined category tag selectors (All, General, Technology, Business, Politics, Science, Entertainment).
+- Interactive amber highlighting for category filter pills when filtering saved reading list topics.
+- Verified visual behavior and category empty states with Playwright test suite (`verify_bookmark_tag_filtering.py`).
+- All 14 backend unit/integration tests passing.
+
+## [0.6.3] - 2026-10-24
+### Added
+- Created dedicated end-to-end automated offline verification script (`scripts/test_offline_data_access.py`) simulating disconnected browser state, validating service worker caching, checking local topic persistence, and testing offline sync queue operations.
+- Synchronized Tauri desktop configuration bundle version to v0.6.3 (`frontend/src-tauri/tauri.conf.json`).
+- Verified 14/14 backend unit/integration tests and offline access suite execution.
+
+## [0.6.2] - 2026-10-24
+### Added
+- Automated offline and PWA distribution build script (`scripts/build_offline_distribution.sh`) validating Web Manifest schemas, icons, Next.js build compilation, and service worker compliance.
+- Added 192x192 and 512x512 maskable PWA icons to `frontend/public/` referenced in `manifest.json`.
+- Comprehensive offline execution documentation in `DEPLOY.md` and `README.md` covering PWA caching, localStorage fallback, and offline sync queue mechanisms.
+- Verified 14/14 backend unit/integration tests and production Next.js build pass.
+
+## [0.6.1] - 2026-10-24
+### Added
+- Multi-runtime platform detection chip in navigation bar dynamically resolving `Desktop (Tauri)`, `PWA`, or `Web` based on browser capabilities and window bindings.
+- Client-side persistent offline sync queue (`omnifeed_sync_queue`) stored in localStorage when disconnected from the backend.
+- Dynamic "⚡ Queue Sync" action button with pulsing counter badge displaying pending synchronization operations while offline.
+- Automated queue flush and ingestion execution upon network reconnection.
+- Verified offline queuing, visual indicators, and headless interactions via Playwright test suite.
+- All 14 backend unit and integration tests passing.
+
+## [0.6.0] - 2026-10-24
+### Added
+- Resilient WebSocket streaming with exponential backoff automatic reconnection (1s scaling to 16s) in `frontend/src/app/page.tsx`.
+- Connection lifecycle indicator badge with informative tooltip ("Live WS", "Reconnecting (attempt #)", or "Polling fallback").
+- All 14 backend unit and integration tests passing.
+- Verified visual connectivity indicators via automated Playwright test suite.
+
+## [0.5.9] - 2026-10-24
+### Added
+- Curated Reading List Export in Markdown and JSON formats (`handleExportBookmarks`) for offline intelligence briefs and reporting.
+- Restructured universal Export dropdown dividing standard filtered feed topics from starred reading list exports.
+- Verified visual menu layout and blob generation via Playwright automated headless tests.
+- All 14 backend unit and integration tests passing.
+
+## [0.5.8] - 2026-10-24
+### Added
+- Client-side topic bookmarking and offline persistence: star bookmark toggle buttons on topic cards, in-modal bookmarking actions, and automatic localStorage synchronization (`omnifeed_bookmarks`).
+- Interactive "★ Bookmarks" category filter button with real-time bookmarked count badge for zero-friction access to saved clusters.
+- Verified persistent state across reloads and offline caching with Playwright headless test and screenshot validation.
+- All 14 backend unit and integration tests passing.
+
+## [0.5.7] - 2026-10-24
+### Added
+- Upgraded `frontend/public/sw.js` with dedicated `omnifeed-api-v2` cache bucket using Network-First with Cache Fallback for all `/api/` GET requests.
+- Implemented automatic local storage backup caching and seamless recovery for topic intelligence in `frontend/src/app/page.tsx`.
+- Created Playwright offline verification test (`/home/jules/verification/verify_pwa_offline.py`) and visually confirmed amber offline banner with cached topic rendering.
+- Developed `/home/jules/self_created_tools/pwa_validator.py` for automated PWA asset and service worker compliance checking.
+- Maintained 100% test pass rate across backend test suite (14/14).
+
 ## [0.5.6] - 2026-10-24
 ### Added
 - Refined Tauri v2 desktop application bundle with `build.rs`, application icons (`icon.png`, `32x32.png`, `128x128.png`), and `tauri::Builder` runner in `frontend/src-tauri/src/main.rs`.

@@ -333,7 +333,23 @@ def run_pipeline_standalone():
         reddit_news = fetch_reddit_posts(subreddit="news", limit=15)
         total_added += cluster_and_persist(db, reddit_news, "Reddit", "social")
 
-        # 4. Social Firehose
+        # 4. Custom Subscribed Feeds from Database
+        custom_sources = db.query(models.Source).filter(
+            models.Source.url.like("http%"),
+            models.Source.type != "social"
+        ).all()
+        for src in custom_sources:
+            # Skip defaults already fetched above
+            if "google.com" in src.url or "yahoo.com" in src.url:
+                continue
+            try:
+                feed_items = fetch_rss_feed(src.url, limit=10)
+                if feed_items:
+                    total_added += cluster_and_persist(db, feed_items, src.name, src.type or "rss")
+            except Exception as e:
+                print(f"Error fetching custom feed {src.name} ({src.url}): {e}")
+
+        # 5. Social Firehose
         total_added += ingest_social_firehose()
 
     finally:

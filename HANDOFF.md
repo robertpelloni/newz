@@ -1,37 +1,26 @@
-# Session Handoff & Continuity Notes
+# Omnifeed (Newz) - Session Handoff & Architecture Notes
 
-## 1. What Was Learned & Discovered
-- **Upstream Scaffolding**: An unmerged upstream branch `origin/omnifeed-scaffolding-v1-12010847412342953271` contained the base project skeleton. Merging required `--allow-unrelated-histories` and fixing an import error (`Source` model not imported into `backend/models.py`).
-- **Postgres Dependency Decoupling**: Without local Postgres/Redis, the backend previously crashed on boot. Adding a graceful SQLite fallback (`sqlite:///./omnifeed.db`) in `backend/database.py` allows full out-of-the-box local operation while maintaining full PostgreSQL compatibility in production.
-- **Frontend Build & Styling**: Next.js 15 with Tailwind CSS v4 required `@tailwindcss/postcss` and a proper `postcss.config.mjs` file to render styles accurately.
-- **Consolidation**: The dashboard was consolidated into a single-page ultra-dense intelligence dashboard (`frontend/src/app/page.tsx`) with category filters, real-time search, global sentiment indicators, source health badges, and modal topic deep-dives.
-- **System Tray**: `scripts/system_tray.py` allows command-line and tray-based service status queries, sync triggering, browser launching, and graceful shutdown.
-- **Milestone 2 & 3 Completion**:
-  - Unsupervised entity parsing and cross-source chronological narrative timeline markers persisted to `Topic` models.
-  - Real-time social firehose streaming (`/api/firehose/simulate`) for Bluesky AT Protocol Jetstream and Mastodon Fediverse timelines.
-  - Local LLM / Ollama bulleted summary generation bridge (`generate_ai_summary`) and `/api/topics/{id}/summarize` endpoint.
-  - Frontend operational dashboard with real-time WebSocket toast alerts, firehose streaming triggers, OLED contrast toggling, CSV/JSON topic exports, and deep-dive modal with AI synthesis refresh buttons.
-- **Milestone 4 Completion & Architectural Design**:
-  - Configured Tauri v2 native desktop application wrapper in `frontend/src-tauri/` (`Cargo.toml`, `tauri.conf.json`, `src/main.rs`, `build.rs`, icons).
-  - Next.js static export pipeline (`output: 'export'`) configured in `frontend/next.config.ts` delivering production assets to `frontend/out`.
-  - Added desktop lifecycle npm scripts (`tauri:dev`, `tauri:build`) in `frontend/package.json`.
-  - PWA offline caching service worker implemented in `frontend/public/sw.js` and registered in `frontend/src/app/page.tsx` with `manifest.json`.
-  - Online/offline network listeners and reactive offline alert banner in `frontend/src/app/page.tsx`.
-  - Comprehensive data flow architecture diagram and ingestion mechanics specified in `README.md`, `VISION.md`, and `MEMORY.md`.
-  - Dynamic single-source versioning helper (`get_app_version()`) wired in `backend/main.py` directly loading from `VERSION.md`.
-  - Chronological timeline tracking in `worker/tasks.py` upgraded with `source_type`, `polarity`, standardized timezone-aware UTC timestamps, and UI chips in `frontend/src/app/page.tsx`.
-  - Deep Architectural Component Specifications articulated in `README.md` across Data Ingestion, Processing/Enrichment Pipeline, and Consolidated Presentation Layer.
+## Session Summary (v0.7.4)
+In this release iteration, we refined real-time data ingestion streaming and offline synchronization:
+1. **Bi-directional WebSocket Streaming & Immediate Telemetry Handshake**:
+   - Enhanced `/api/ws/feed` in `backend/main.py` to immediately deliver a full telemetry snapshot (system counts, overall sentiment, and recent topic deltas) upon client connection handshake.
+   - Added client action handling (`{"action": "request_snapshot"}`) to reply on demand with fresh system metrics and recent story clusters.
+2. **Continuous Client-side Offline Synchronization**:
+   - Updated `frontend/src/app/page.tsx` to automatically persist incoming WebSocket delta topics into the IndexedDB offline vault (`saveTopicsToIndexedDB`), continuously priming offline storage without requiring manual fetches.
+   - Guarded WebSocket connection checks and re-connection reconciliation.
+3. **Automated Testing & End-to-End Verification**:
+   - Added unit test `test_websocket_immediate_snapshot_and_request_action` in `backend/tests/test_api.py` (17/17 tests passing).
+   - Executed Playwright automated offline verification suite (`scripts/test_offline_data_access.py`).
+   - Verified Next.js production build (`npm run build`).
+   - Synchronized single-source version `0.7.4` across `VERSION.md`, `frontend/src-tauri/tauri.conf.json`, `CHANGELOG.md`, `ROADMAP.md`, `TODO.md`, and `HANDOFF.md`.
 
-## 2. Current State of Running Processes
-- Backend: Uvicorn running on `0.0.0.0:8000` (live, passing all 14 automated API & model tests).
-- Frontend: Next.js static production bundle exported to `frontend/out/` and server verified on `0.0.0.0:3000`.
-- SQLite Database: `omnifeed.db` populated with real-time news clusters, social sentiment records, entity extractions, and timeline events.
+## Active Runtime Environment:
+- **Current Version**: v0.7.4 (tracked in `VERSION.md`).
+- **Git Branch**: `jules-6192871868108129425-4e3e34d4`
+- **Active Ports**:
+  - FastAPI Backend: `http://localhost:8000` (PID managed, live telemetry delta streaming on `/api/ws/feed`)
+  - Next.js Production Server: `http://localhost:3000` (PID managed)
 
-## 3. Resume Instructions for Next Session
-- To run tests: `/home/jules/.pyenv/shims/python3 -m pytest backend/tests/ -v`
-- To run worker sync: `python3 scripts/system_tray.py --sync`
-- To stream firehose: `curl -X POST http://localhost:8000/api/firehose/simulate`
-- To build static frontend export: `npm --prefix frontend run build`
-- To build desktop binary: `npm --prefix frontend run tauri:build`
-- To inspect UI: Visit `http://localhost:3000`
-- To stop all servers cleanly: `python3 scripts/system_tray.py --stop`
+## Next Steps for Successor Models:
+- Optional: Add periodic automated background latency heartbeats for subscribed RSS sources.
+- Optional: Add tag-based search and custom annotation tags for offline saved bookmarks.
