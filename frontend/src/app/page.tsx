@@ -678,7 +678,9 @@ export default function Dashboard() {
           {/* Category Tabs & Bookmarks */}
           <div className="flex items-center space-x-1 overflow-x-auto pb-1 md:pb-0">
             <button
-              onClick={() => setShowOnlyBookmarks(!showOnlyBookmarks)}
+              onClick={() => {
+                setShowOnlyBookmarks(!showOnlyBookmarks);
+              }}
               title="Filter to bookmarked topics stored in local client memory"
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap flex items-center space-x-1 border ${
                 showOnlyBookmarks
@@ -694,11 +696,12 @@ export default function Dashboard() {
                 key={cat}
                 onClick={() => {
                   setActiveCategory(cat);
-                  setShowOnlyBookmarks(false);
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition whitespace-nowrap ${
-                  !showOnlyBookmarks && activeCategory === cat
-                    ? "bg-cyan-600 text-white"
+                  activeCategory === cat
+                    ? showOnlyBookmarks
+                      ? "bg-amber-600 text-white"
+                      : "bg-cyan-600 text-white"
                     : "bg-slate-800/60 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
                 }`}
               >
@@ -746,15 +749,21 @@ export default function Dashboard() {
             <div className="text-center py-12 text-slate-500 text-sm animate-pulse">
               Loading clustered intelligence feeds...
             </div>
-          ) : (showOnlyBookmarks ? topics.filter((t) => bookmarkedIds.includes(t.id)) : topics).length === 0 ? (
+          ) : (showOnlyBookmarks
+                ? topics.filter((t) => bookmarkedIds.includes(t.id) && (activeCategory === "All" || (t.category || "").toLowerCase() === activeCategory.toLowerCase()))
+                : topics
+              ).length === 0 ? (
             <div className="text-center py-12 border border-dashed border-slate-800 rounded-xl text-slate-500 text-sm">
               {showOnlyBookmarks
-                ? "No bookmarked topics found. Bookmark topics to read offline anytime!"
+                ? `No bookmarked topics found in ${activeCategory}. Bookmark topics to read offline anytime!`
                 : "No matching topic clusters found. Try hitting ⚡ Sync Ingestion."}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(showOnlyBookmarks ? topics.filter((t) => bookmarkedIds.includes(t.id)) : topics).map((t) => {
+              {(showOnlyBookmarks
+                ? topics.filter((t) => bookmarkedIds.includes(t.id) && (activeCategory === "All" || (t.category || "").toLowerCase() === activeCategory.toLowerCase()))
+                : topics
+              ).map((t) => {
                 const isBookmarked = bookmarkedIds.includes(t.id);
                 return (
                   <div

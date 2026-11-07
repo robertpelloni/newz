@@ -2,6 +2,13 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.6.4] - 2026-10-24
+### Added
+- Enhanced topic bookmark filtering with combined category tag selectors (All, General, Technology, Business, Politics, Science, Entertainment).
+- Interactive amber highlighting for category filter pills when filtering saved reading list topics.
+- Verified visual behavior and category empty states with Playwright test suite (`verify_bookmark_tag_filtering.py`).
+- All 14 backend unit/integration tests passing.
+
 ## [0.6.3] - 2026-10-24
 ### Added
 - Created dedicated end-to-end automated offline verification script (`scripts/test_offline_data_access.py`) simulating disconnected browser state, validating service worker caching, checking local topic persistence, and testing offline sync queue operations.

@@ -1,19 +1,17 @@
 # Omnifeed (Newz) - Session Handoff & Architecture Notes
 
-## Session Summary (v0.6.3)
-In this release iteration, we developed end-to-end testing for offline data access and verified Tauri configuration:
-1. **Automated Offline Data Access Test Suite**:
-   - Implemented `scripts/test_offline_data_access.py`.
-   - Simulates disconnected state via Playwright context and window events.
-   - Confirms cached intelligence feed presentation from local storage, appearance of the amber offline indicator banner, and queueing of ingestion actions into `omnifeed_sync_queue`.
-2. **Tauri Desktop Configuration Synchronization**:
-   - Updated `frontend/src-tauri/tauri.conf.json` version string to match `0.6.3`.
-   - Verified desktop window parameters, tray icon paths, and identifiers.
-3. **Automated Testing & Verification**:
-   - Executed full test suite (`python -m pytest backend/tests/ -v`) with 14/14 tests passing.
-   - Executed `scripts/test_offline_data_access.py` and captured screenshot `offline_data_access_test.png`.
-   - Synchronized single-source version in `VERSION.md` to v0.6.3.
+## Session Summary (v0.6.4)
+In this release iteration, we implemented combined category tag filtering within bookmarked topics:
+1. **Bookmark Category Tag Filtering**:
+   - Extended `frontend/src/app/page.tsx` so users can filter saved bookmarks by topic categories (All, General, Technology, Business, Politics, Science, Entertainment).
+   - Category filter pills dynamically highlight in amber when the user is inspecting bookmarks.
+   - Informative category-specific empty state messaging when no bookmarks match the selected category.
+2. **Automated Testing & Visual Verification**:
+   - Created `/home/jules/verification/verify_bookmark_tag_filtering.py` verifying bookmarking, tab switching, and tag selection.
+   - Verified visual UI state with screenshot `bookmark_tag_filtering_verification.png`.
+   - Verified 14/14 backend unit/integration tests passing.
+   - Bumped single-source version in `VERSION.md` to v0.6.4.
 
 ## Next Steps for Successor Models:
-- Optional: Add custom tag filters for bookmarks (e.g. Work, Politics, AI Research).
-- Optional: Implement client-side notification badges for breaking topics with high controversy scores.
+- Optional: Implement client-side notification badges or audio chimes for breaking topics with high controversy scores.
+- Optional: Add custom user-created tag annotations for bookmarked clusters.
