@@ -10,6 +10,9 @@ interface Topic {
   first_seen: string | null;
   last_updated: string | null;
   article_count: number;
+  controversy_score?: number;
+  sentiment_score?: number;
+  is_breaking?: boolean;
 }
 
 interface SystemStatus {
@@ -93,8 +96,31 @@ export default function Dashboard() {
   const [showOnlyBookmarks, setShowOnlyBookmarks] = useState<boolean>(false);
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
   const [platformName, setPlatformName] = useState<string>("Web");
+  const [audioAlertsEnabled, setAudioAlertsEnabled] = useState<boolean>(false);
 
   const categories = ["All", "General", "Technology", "Business", "Politics", "Science", "Entertainment"];
+
+  const playChime = () => {
+    try {
+      if (typeof window === "undefined") return;
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+    } catch {
+      // AudioContext unavailable or blocked by browser policy
+    }
+  };
 
   // Register PWA service worker, online/offline listener, offline sync replay, and load bookmarks
   useEffect(() => {
@@ -204,6 +230,7 @@ export default function Dashboard() {
             const payload = JSON.parse(event.data);
             if (payload.event === "sync_completed" || payload.event === "firehose_pulse") {
               setLiveAlert(payload.message || "New stories ingested & clustered!");
+              if (audioAlertsEnabled) playChime();
               fetchSystemData();
               fetchTopics();
               setTimeout(() => setLiveAlert(null), 4000);
@@ -507,6 +534,23 @@ export default function Dashboard() {
             </span>
           </div>
 
+          {/* Audio Chime Alert Toggle */}
+          <button
+            onClick={() => {
+              const nextState = !audioAlertsEnabled;
+              setAudioAlertsEnabled(nextState);
+              if (nextState) playChime();
+            }}
+            title={audioAlertsEnabled ? "Audio chimes enabled for breaking news events" : "Enable audio chimes for breaking news events"}
+            className={`px-2.5 py-1.5 text-xs font-semibold rounded border transition ${
+              audioAlertsEnabled
+                ? "bg-amber-500/20 text-amber-400 border-amber-500/50"
+                : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
+            }`}
+          >
+            {audioAlertsEnabled ? "🔔 Audio On" : "🔕 Audio"}
+          </button>
+
           {/* OLED Contrast Switch */}
           <button
             onClick={() => setOledMode(!oledMode)}
@@ -773,9 +817,20 @@ export default function Dashboard() {
                   >
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-cyan-400">
-                          {t.category || "General"}
-                        </span>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-cyan-400">
+                            {t.category || "General"}
+                          </span>
+                          {t.is_breaking && (
+                            <span
+                              title={`High controversy / high-velocity topic (controversy: ${t.controversy_score})`}
+                              className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-red-950/80 text-red-400 border border-red-800/80 animate-pulse flex items-center space-x-1"
+                            >
+                              <span>🔥</span>
+                              <span>Breaking</span>
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={(e) => toggleBookmark(t.id, e)}

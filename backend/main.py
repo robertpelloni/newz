@@ -155,6 +155,14 @@ def get_topics(
     items = []
     for t in topics:
         article_count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
+        # Query latest sentiment score/controversy
+        latest_sentiment = db.query(models.Sentiment).filter(models.Sentiment.topic_id == t.id).order_by(models.Sentiment.id.desc()).first()
+        controversy_score = 0.0
+        sentiment_score = 0.0
+        if latest_sentiment and latest_sentiment.breakdown_json:
+            controversy_score = latest_sentiment.breakdown_json.get("controversy", 0.0)
+            sentiment_score = latest_sentiment.overall_score or 0.0
+
         items.append({
             "id": t.id,
             "title": t.title,
@@ -163,6 +171,9 @@ def get_topics(
             "first_seen": t.first_seen.isoformat() if t.first_seen else None,
             "last_updated": t.last_updated.isoformat() if t.last_updated else None,
             "article_count": article_count,
+            "controversy_score": round(controversy_score, 2),
+            "sentiment_score": round(sentiment_score, 2),
+            "is_breaking": (controversy_score >= 0.4 or article_count >= 15),
         })
 
     return {

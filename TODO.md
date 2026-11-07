@@ -36,3 +36,4 @@
 - [x] Automated PWA offline distribution build script (`scripts/build_offline_distribution.sh`) and offline documentation (v0.6.2).
 - [x] End-to-end automated offline data access validation script (`scripts/test_offline_data_access.py`) and Tauri config v0.6.3 sync (v0.6.3).
 - [x] Category tag filtering for saved reading list bookmarks (v0.6.4).
+- [x] Breaking news controversy badges and Web Audio alert chimes (v0.6.5).

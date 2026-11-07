@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.6.5] - 2026-10-24
+### Added
+- Breaking news controversy indicators ("🔥 BREAKING") on high-controversy and high-velocity topic clusters.
+- Synthesized Web Audio API alert chime toggle ("🔔 Audio On" / "🔕 Audio") in dashboard header for instant auditory breaking alerts without external audio file dependencies.
+- Backend `/api/topics` endpoint enhanced with `controversy_score`, `sentiment_score`, and `is_breaking` boolean flags.
+- Verified breaking badges and audio toggle with Playwright test suite (`verify_breaking_alert_and_audio.py`).
+- All 14 backend unit/integration tests passing.
+
 ## [0.6.4] - 2026-10-24
 ### Added
 - Enhanced topic bookmark filtering with combined category tag selectors (All, General, Technology, Business, Politics, Science, Entertainment).

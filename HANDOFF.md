@@ -1,17 +1,20 @@
 # Omnifeed (Newz) - Session Handoff & Architecture Notes
 
-## Session Summary (v0.6.4)
-In this release iteration, we implemented combined category tag filtering within bookmarked topics:
-1. **Bookmark Category Tag Filtering**:
-   - Extended `frontend/src/app/page.tsx` so users can filter saved bookmarks by topic categories (All, General, Technology, Business, Politics, Science, Entertainment).
-   - Category filter pills dynamically highlight in amber when the user is inspecting bookmarks.
-   - Informative category-specific empty state messaging when no bookmarks match the selected category.
-2. **Automated Testing & Visual Verification**:
-   - Created `/home/jules/verification/verify_bookmark_tag_filtering.py` verifying bookmarking, tab switching, and tag selection.
-   - Verified visual UI state with screenshot `bookmark_tag_filtering_verification.png`.
+## Session Summary (v0.6.5)
+In this release iteration, we added breaking news controversy indicators and synthesized Web Audio alert chimes:
+1. **Breaking News Controversy Badges**:
+   - Enhanced `backend/main.py` `/api/topics` endpoint with calculated `controversy_score`, `sentiment_score`, and boolean `is_breaking` indicator (flagging clusters with controversy >= 0.4 or source velocity >= 15).
+   - Displayed animated red "🔥 BREAKING" badges on high-controversy topic cards in `frontend/src/app/page.tsx`.
+2. **Zero-Dependency Web Audio API Alert Chimes**:
+   - Added `playChime()` in `frontend/src/app/page.tsx` generating a clean harmonic sine wave alert (587.33 Hz to 880 Hz ramp) using the standard browser Web Audio API without requiring any external MP3/WAV files.
+   - Added an interactive toggle ("🔔 Audio On" / "🔕 Audio") in the dashboard navigation bar.
+   - Automatically triggers auditory chimes on live WebSocket incoming events when enabled.
+3. **Automated Testing & Visual Verification**:
+   - Created `/home/jules/verification/verify_breaking_alert_and_audio.py` verifying breaking cluster detection and chime toggling.
+   - Inspected visual screenshot `breaking_alert_and_audio_verification.png`.
    - Verified 14/14 backend unit/integration tests passing.
-   - Bumped single-source version in `VERSION.md` to v0.6.4.
+   - Bumped single-source version in `VERSION.md` to v0.6.5.
 
 ## Next Steps for Successor Models:
-- Optional: Implement client-side notification badges or audio chimes for breaking topics with high controversy scores.
 - Optional: Add custom user-created tag annotations for bookmarked clusters.
+- Optional: Add custom RSS feed subscription URL input form in the dashboard.
