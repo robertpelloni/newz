@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.7.9] - 2026-11-07
+### Added
+- Concurrent bulk feed health diagnostics and latency probing endpoint `POST /api/sources/ping-all` in `backend/main.py`.
+- Interactive "⚡ Ping All Feeds" button in the Feeds modal in `frontend/src/app/page.tsx` with instant batch health updates and offline local storage caching.
+- Automated backend unit test `test_feed_sources_bulk_health_ping` verifying concurrent health status across all registered sources (18/18 tests passing).
+
 ## [0.7.8] - 2026-11-07
 ### Added
 - Offline intelligence vault file import (`importOfflineVault`) and restoration button (`📥 Import Vault`) in the Offline Storage Manager modal.

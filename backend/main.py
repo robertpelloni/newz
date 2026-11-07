@@ -267,18 +267,11 @@ def delete_source(source_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success", "message": f"Source {source_id} removed successfully."}
 
-@app.post("/api/sources/{source_id}/ping", response_model=schemas.SourcePingResponse)
-def ping_source(source_id: int, db: Session = Depends(get_db)):
-    """Probe feed source health and measure response latency."""
+def probe_single_source(source: models.Source) -> dict:
     import time
     import urllib.request
-    source = db.query(models.Source).filter(models.Source.id == source_id).first()
-    if not source:
-        raise HTTPException(status_code=404, detail="Feed source not found.")
-
     start_time = time.time()
     try:
-        # Check endpoint latency with short timeout
         req = urllib.request.Request(
             source.url,
             headers={"User-Agent": "Omnifeed-HealthCheck/1.0"}
@@ -294,7 +287,7 @@ def ping_source(source_id: int, db: Session = Depends(get_db)):
                 "latency_ms": round(latency, 1),
                 "http_code": status_code
             }
-    except Exception as e:
+    except Exception:
         latency = (time.time() - start_time) * 1000.0
         return {
             "id": source.id,
@@ -304,6 +297,40 @@ def ping_source(source_id: int, db: Session = Depends(get_db)):
             "latency_ms": round(latency, 1),
             "http_code": None
         }
+
+@app.post("/api/sources/{source_id}/ping", response_model=schemas.SourcePingResponse)
+def ping_source(source_id: int, db: Session = Depends(get_db)):
+    """Probe feed source health and measure response latency."""
+    source = db.query(models.Source).filter(models.Source.id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Feed source not found.")
+    return probe_single_source(source)
+
+@app.post("/api/sources/ping-all", response_model=list[schemas.SourcePingResponse])
+def ping_all_sources(db: Session = Depends(get_db)):
+    """Probe health and measure response latency across all registered feed sources concurrently."""
+    import concurrent.futures
+    sources = db.query(models.Source).all()
+    if not sources:
+        return []
+
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sources), 8)) as executor:
+        future_to_source = {executor.submit(probe_single_source, s): s for s in sources}
+        for future in concurrent.futures.as_completed(future_to_source):
+            try:
+                results.append(future.result())
+            except Exception:
+                s = future_to_source[future]
+                results.append({
+                    "id": s.id,
+                    "name": s.name,
+                    "url": s.url,
+                    "status": "unreachable",
+                    "latency_ms": 0.0,
+                    "http_code": None
+                })
+    return sorted(results, key=lambda x: x["id"])
 
 @app.get("/api/topics")
 def get_topics(

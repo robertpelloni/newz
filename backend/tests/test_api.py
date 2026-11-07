@@ -215,3 +215,15 @@ def test_websocket_immediate_snapshot_and_request_action():
         assert "telemetry" in reply
         assert "recent_topics" in reply
         assert "overall_sentiment" in reply
+
+def test_feed_sources_bulk_health_ping():
+    res = client.post("/api/sources/ping-all")
+    assert res.status_code == 200
+    items = res.json()
+    assert isinstance(items, list)
+    assert len(items) > 0
+    for s in items:
+        assert "id" in s
+        assert "status" in s
+        assert "latency_ms" in s
+        assert s["status"] in ["healthy", "degraded", "unreachable"]

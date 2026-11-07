@@ -1695,9 +1695,40 @@ export default function Dashboard() {
 
             {/* Active Sources List */}
             <div className="space-y-3">
-              <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">
-                Active Ingestion Channels ({feedSources.length})
-              </h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">
+                  Active Ingestion Channels ({feedSources.length})
+                </h4>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`${API_BASE}/api/sources/ping-all`, { method: "POST" });
+                      if (res.ok) {
+                        const pingResults: Array<{ id: number; status: string; latency_ms: number }> = await res.json();
+                        setFeedSources((prev) => {
+                          const updated = prev.map((s) => {
+                            const found = pingResults.find((p) => p.id === s.id);
+                            return found ? { ...s, status: found.status, latency_ms: found.latency_ms } : s;
+                          });
+                          try {
+                            localStorage.setItem("omnifeed_sources_cache", JSON.stringify(updated));
+                          } catch (_) {}
+                          return updated;
+                        });
+                        setLiveAlert("Health diagnostics updated for all feed sources.");
+                        setTimeout(() => setLiveAlert(null), 3000);
+                      }
+                    } catch (e) {
+                      console.error("Bulk ping failed:", e);
+                    }
+                  }}
+                  title="Probe latency and reachability across all registered feed sources concurrently"
+                  className="px-2 py-1 text-[10px] font-semibold bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800 rounded transition flex items-center space-x-1"
+                >
+                  <span>⚡ Ping All Feeds</span>
+                </button>
+              </div>
               <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
                 {feedSources.map((source) => (
                   <div
