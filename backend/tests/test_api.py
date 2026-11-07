@@ -179,3 +179,21 @@ def test_custom_feed_subscription_lifecycle():
     # 5. Check source is no longer present
     get_after = client.get("/api/sources")
     assert not any(s["id"] == source_id for s in get_after.json())
+
+def test_feed_source_health_ping():
+    # Fetch first available source or register a dummy source
+    sources_res = client.get("/api/sources")
+    assert sources_res.status_code == 200
+    sources = sources_res.json()
+    assert len(sources) > 0
+    source_id = sources[0]["id"]
+
+    # Execute health ping
+    ping_res = client.post(f"/api/sources/{source_id}/ping")
+    assert ping_res.status_code == 200
+    data = ping_res.json()
+    assert data["id"] == source_id
+    assert "status" in data
+    assert data["status"] in ["healthy", "degraded", "unreachable"]
+    assert "latency_ms" in data
+    assert isinstance(data["latency_ms"], float)

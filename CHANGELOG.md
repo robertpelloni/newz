@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.7.1] - 2026-10-24
+### Added
+- Feed Source Health Diagnostics & Latency Probing endpoint `POST /api/sources/{id}/ping` in `backend/main.py`.
+- Response schemas `SourcePingResponse` and health metadata attributes (`status`, `latency_ms`) in `backend/schemas.py`.
+- Interactive "⚡ Ping" action button on feed cards with real-time health indicator chips (`● healthy (<latency>ms)`) in `frontend/src/app/page.tsx`.
+- Automated test `test_feed_source_health_ping` in `backend/tests/test_api.py` (16/16 backend tests passing).
+- Verified feed health probe visual interactions via Playwright test (`verify_feed_ping.py`).
+
 ## [0.7.0] - 2026-10-24
 ### Added
 - Upgraded Service Worker (`frontend/public/sw.js`) to cache buckets `omnifeed-static-v3` and `omnifeed-api-v3`.

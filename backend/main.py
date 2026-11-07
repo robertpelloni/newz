@@ -200,6 +200,44 @@ def delete_source(source_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success", "message": f"Source {source_id} removed successfully."}
 
+@app.post("/api/sources/{source_id}/ping", response_model=schemas.SourcePingResponse)
+def ping_source(source_id: int, db: Session = Depends(get_db)):
+    """Probe feed source health and measure response latency."""
+    import time
+    import urllib.request
+    source = db.query(models.Source).filter(models.Source.id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Feed source not found.")
+
+    start_time = time.time()
+    try:
+        # Check endpoint latency with short timeout
+        req = urllib.request.Request(
+            source.url,
+            headers={"User-Agent": "Omnifeed-HealthCheck/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=4.0) as resp:
+            status_code = resp.getcode()
+            latency = (time.time() - start_time) * 1000.0
+            return {
+                "id": source.id,
+                "name": source.name,
+                "url": source.url,
+                "status": "healthy" if status_code < 400 else "degraded",
+                "latency_ms": round(latency, 1),
+                "http_code": status_code
+            }
+    except Exception as e:
+        latency = (time.time() - start_time) * 1000.0
+        return {
+            "id": source.id,
+            "name": source.name,
+            "url": source.url,
+            "status": "unreachable",
+            "latency_ms": round(latency, 1),
+            "http_code": None
+        }
+
 @app.get("/api/topics")
 def get_topics(
     page: int = Query(1, ge=1),

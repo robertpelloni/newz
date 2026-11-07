@@ -75,6 +75,8 @@ interface FeedSource {
   url: string;
   active: boolean;
   article_count?: number;
+  status?: string;
+  latency_ms?: number;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -399,6 +401,30 @@ export default function Dashboard() {
       setFeedSubmitError("Network error: Could not reach feed registry.");
     } finally {
       setIsAddingFeed(false);
+    }
+  };
+
+  const [pingingSourceId, setPingingSourceId] = useState<number | null>(null);
+
+  const handlePingSource = async (id: number) => {
+    setPingingSourceId(id);
+    try {
+      const res = await fetch(`${API_BASE}/api/sources/${id}/ping`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setFeedSources((prev) =>
+          prev.map((s) =>
+            s.id === id ? { ...s, status: data.status, latency_ms: data.latency_ms } : s
+          )
+        );
+      }
+    } catch (e) {
+      console.error("Feed ping failed:", e);
+      setFeedSources((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, status: "unreachable" } : s))
+      );
+    } finally {
+      setPingingSourceId(null);
     }
   };
 
@@ -1329,16 +1355,41 @@ export default function Dashboard() {
                       {source.url && (
                         <p className="text-[11px] text-slate-500 truncate max-w-sm">{source.url}</p>
                       )}
+                      {source.latency_ms !== undefined && (
+                        <div className="flex items-center space-x-1 text-[10px] pt-0.5">
+                          <span
+                            className={
+                              source.status === "healthy"
+                                ? "text-emerald-400"
+                                : source.status === "degraded"
+                                ? "text-amber-400"
+                                : "text-rose-400"
+                            }
+                          >
+                            ● {source.status} ({source.latency_ms}ms)
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    {source.id > 5 && (
+                    <div className="flex items-center space-x-1">
                       <button
-                        onClick={() => handleDeleteFeed(source.id)}
-                        title="Unsubscribe from feed source"
-                        className="text-rose-400 hover:text-rose-300 p-1.5 rounded hover:bg-rose-950/40 transition"
+                        onClick={() => handlePingSource(source.id)}
+                        disabled={pingingSourceId === source.id}
+                        title="Probe feed health and measure endpoint latency"
+                        className="px-2 py-1 text-[10px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition"
                       >
-                        🗑️
+                        {pingingSourceId === source.id ? "Pinging..." : "⚡ Ping"}
                       </button>
-                    )}
+                      {source.id > 5 && (
+                        <button
+                          onClick={() => handleDeleteFeed(source.id)}
+                          title="Unsubscribe from feed source"
+                          className="text-rose-400 hover:text-rose-300 p-1.5 rounded hover:bg-rose-950/40 transition"
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

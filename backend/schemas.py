@@ -48,8 +48,18 @@ class SourceResponse(BaseModel):
     url: str
     active: bool = True
     article_count: int = 0
+    status: str = "healthy"
+    latency_ms: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+class SourcePingResponse(BaseModel):
+    id: int
+    name: str
+    url: str
+    status: str
+    latency_ms: float
+    http_code: Optional[int] = None
 
 class TopicDeepDive(BaseModel):
     topic: TopicResponse
