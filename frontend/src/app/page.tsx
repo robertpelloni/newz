@@ -74,6 +74,7 @@ interface FeedSource {
   type: string;
   url: string;
   active: boolean;
+  article_count?: number;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -1278,6 +1279,9 @@ export default function Dashboard() {
                           {source.type}
                         </span>
                         <span className="text-[10px] text-emerald-400">● Active</span>
+                        <span className="text-[10px] text-slate-400 bg-slate-900 px-1.5 py-0.2 rounded border border-slate-800 font-mono">
+                          {source.article_count !== undefined ? `${source.article_count} articles` : "0 articles"}
+                        </span>
                       </div>
                       {source.url && (
                         <p className="text-[11px] text-slate-500 truncate max-w-sm">{source.url}</p>

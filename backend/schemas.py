@@ -47,6 +47,7 @@ class SourceResponse(BaseModel):
     type: str
     url: str
     active: bool = True
+    article_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 

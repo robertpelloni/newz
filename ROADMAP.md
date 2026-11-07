@@ -35,5 +35,6 @@
 - [x] Breaking controversy indicators and synthesized Web Audio alert chimes (v0.6.5).
 - [x] Offline topic detail caching and seamless cluster deep-dive inspection during disconnection (v0.6.6).
 - [x] Dynamic custom RSS/Atom feed source subscription and registry management (v0.6.7).
+- [x] Automated custom feed ingestion pipeline and per-source article productivity diagnostics (v0.6.8).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

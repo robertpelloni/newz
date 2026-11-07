@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.6.8] - 2026-10-24
+### Added
+- Integrated custom subscribed feeds directly into ingestion and clustering pipeline in `worker/tasks.py`.
+- Added per-feed `article_count` productivity metrics in `GET /api/sources` and `backend/schemas.py`.
+- Displayed live article count badges on source cards in the dashboard Feed Management modal (`frontend/src/app/page.tsx`).
+- Updated unit test suite in `backend/tests/test_api.py` validating article count diagnostics (15/15 tests passing).
+- Verified UI diagnostics with Playwright test (`verify_feed_source_diagnostics.py`).
+
 ## [0.6.7] - 2026-10-24
 ### Added
 - Custom feed subscription endpoints (`POST /api/sources` and `DELETE /api/sources/{id}`) in `backend/main.py`.

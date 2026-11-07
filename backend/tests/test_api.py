@@ -139,11 +139,14 @@ def test_custom_feed_subscription_lifecycle():
     assert created["url"] == "https://www.technologyreview.com/feed/"
     source_id = created["id"]
 
-    # 2. Check source appears in GET /api/sources
+    # 2. Check source appears in GET /api/sources with article_count field
     get_res = client.get("/api/sources")
     assert get_res.status_code == 200
     sources = get_res.json()
-    assert any(s["id"] == source_id for s in sources)
+    target_src = next((s for s in sources if s["id"] == source_id), None)
+    assert target_src is not None
+    assert "article_count" in target_src
+    assert isinstance(target_src["article_count"], int)
 
     # 3. Duplicate insertion returns existing source
     dup_res = client.post("/api/sources", json=payload)

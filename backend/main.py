@@ -141,7 +141,18 @@ def get_sources(db: Session = Depends(get_db)):
             db.rollback()
             return [{"id": i + 1, "name": d["name"], "type": d["type"], "url": d["url"], "active": True} for i, d in enumerate(defaults)]
 
-    return [{"id": s.id, "name": s.name, "type": s.type, "url": s.url, "active": True} for s in sources]
+    result = []
+    for s in sources:
+        art_count = db.query(models.Article).filter(models.Article.source_id == s.id).count()
+        result.append({
+            "id": s.id,
+            "name": s.name,
+            "type": s.type,
+            "url": s.url,
+            "active": True,
+            "article_count": art_count
+        })
+    return result
 
 @app.post("/api/sources", response_model=schemas.SourceResponse)
 def create_source(source_in: schemas.SourceCreate, db: Session = Depends(get_db)):
@@ -152,7 +163,15 @@ def create_source(source_in: schemas.SourceCreate, db: Session = Depends(get_db)
     # Check for existing feed with same URL
     existing = db.query(models.Source).filter(models.Source.url == source_in.url.strip()).first()
     if existing:
-        return existing
+        art_count = db.query(models.Article).filter(models.Article.source_id == existing.id).count()
+        return {
+            "id": existing.id,
+            "name": existing.name,
+            "type": existing.type,
+            "url": existing.url,
+            "active": True,
+            "article_count": art_count
+        }
 
     new_source = models.Source(
         name=source_in.name.strip(),
@@ -162,7 +181,14 @@ def create_source(source_in: schemas.SourceCreate, db: Session = Depends(get_db)
     db.add(new_source)
     db.commit()
     db.refresh(new_source)
-    return new_source
+    return {
+        "id": new_source.id,
+        "name": new_source.name,
+        "type": new_source.type,
+        "url": new_source.url,
+        "active": True,
+        "article_count": 0
+    }
 
 @app.delete("/api/sources/{source_id}")
 def delete_source(source_id: int, db: Session = Depends(get_db)):
