@@ -249,8 +249,28 @@ export default function Dashboard() {
             if (payload.event === "sync_completed" || payload.event === "firehose_pulse") {
               setLiveAlert(payload.message || "New stories ingested & clustered!");
               if (audioAlertsEnabled) playChime();
+
+              // Optimistic instant telemetry update from WebSocket payload
+              if (payload.telemetry) {
+                setStatus((prev) => prev ? { ...prev, counts: payload.telemetry } : null);
+              }
+              if (payload.overall_sentiment !== undefined) {
+                setPulse((prev) => prev ? { ...prev, overall_sentiment: payload.overall_sentiment } : null);
+              }
+
+              // Optimistic topic prepend if recent_topics are provided in delta
+              if (Array.isArray(payload.recent_topics) && payload.recent_topics.length > 0 && page === 1 && activeCategory === "All" && !searchQuery.trim()) {
+                setTopics((prev) => {
+                  const map = new Map<number, Topic>();
+                  payload.recent_topics.forEach((t: Topic) => map.set(t.id, t));
+                  prev.forEach((t) => { if (!map.has(t.id)) map.set(t.id, t); });
+                  return Array.from(map.values()).slice(0, pageSize);
+                });
+              } else {
+                fetchTopics();
+              }
+
               fetchSystemData();
-              fetchTopics();
               setTimeout(() => setLiveAlert(null), 4000);
             }
           } catch (err) {

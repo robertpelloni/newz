@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.6.9] - 2026-10-24
+### Added
+- Optimized WebSocket broadcast streaming in `backend/main.py` with delta updates (`recent_topics`), live telemetry counts, and sentiment metrics delivered directly over the active socket.
+- Added live snapshot telemetry helper `get_live_telemetry_snapshot(db)` in `backend/main.py`.
+- Instantaneous client-side state merging in `frontend/src/app/page.tsx` directly inserting WebSocket topic deltas into page 1 clusters and updating telemetry counters without requiring full round-trip HTTP refetches.
+- Added automated unit test `test_websocket_optimized_broadcast_payload` in `backend/tests/test_api.py` (16/16 tests passing).
+- Verified WebSocket live broadcast streaming and instant UI updates via Playwright test suite (`verify_websocket_streaming_optimization.py`).
+
 ## [0.6.8] - 2026-10-24
 ### Added
 - Integrated custom subscribed feeds directly into ingestion and clustering pipeline in `worker/tasks.py`.

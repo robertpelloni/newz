@@ -69,6 +69,24 @@ def test_websocket_feed():
         pong = websocket.receive_json()
         assert pong["event"] == "pong"
 
+def test_websocket_optimized_broadcast_payload():
+    with client.websocket_connect("/api/ws/feed") as websocket:
+        init_data = websocket.receive_json()
+        assert init_data["event"] == "connected"
+
+        # Trigger simulated firehose which broadcasts enriched payload
+        firehose_res = client.post("/api/firehose/simulate")
+        assert firehose_res.status_code == 200
+
+        # Receive streamed broadcast event
+        msg = websocket.receive_json()
+        assert msg["event"] == "firehose_pulse"
+        assert "telemetry" in msg
+        assert "articles" in msg["telemetry"]
+        assert "overall_sentiment" in msg
+        assert "recent_topics" in msg
+        assert isinstance(msg["recent_topics"], list)
+
 def test_topic_detail_entities_and_timeline():
     # Fetch first topic
     topics_res = client.get("/api/topics")

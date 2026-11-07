@@ -401,33 +401,86 @@ def get_sentiment_pulse(db: Session = Depends(get_db)):
         "sample_size": len(scores)
     }
 
+def get_live_telemetry_snapshot(db: Session) -> dict:
+    """Helper to extract lightweight current system telemetry and recent topic deltas."""
+    art_count = db.query(models.Article).count()
+    top_count = db.query(models.Topic).count()
+    disc_count = db.query(models.Discussion).count()
+
+    # Calculate quick sentiment
+    sentiments = db.query(models.Sentiment).order_by(models.Sentiment.id.desc()).limit(50).all()
+    scores = [s.overall_score for s in sentiments if s.overall_score is not None]
+    avg_score = round(sum(scores) / len(scores), 2) if scores else 0.0
+
+    # Get 5 most recent topics
+    recent_topics = db.query(models.Topic).order_by(models.Topic.last_updated.desc()).limit(5).all()
+    recent_items = []
+    for t in recent_topics:
+        count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
+        latest_sentiment = db.query(models.Sentiment).filter(models.Sentiment.topic_id == t.id).order_by(models.Sentiment.id.desc()).first()
+        controversy = 0.0
+        sentiment = 0.0
+        if latest_sentiment and latest_sentiment.breakdown_json:
+            controversy = latest_sentiment.breakdown_json.get("controversy", 0.0)
+            sentiment = latest_sentiment.overall_score or 0.0
+        recent_items.append({
+            "id": t.id,
+            "title": t.title,
+            "summary": t.summary,
+            "category": t.category,
+            "first_seen": t.first_seen.isoformat() if t.first_seen else None,
+            "last_updated": t.last_updated.isoformat() if t.last_updated else None,
+            "article_count": count,
+            "controversy_score": round(controversy, 2),
+            "sentiment_score": round(sentiment, 2),
+            "is_breaking": (controversy >= 0.4 or count >= 15),
+        })
+
+    return {
+        "counts": {
+            "articles": art_count,
+            "topics": top_count,
+            "discussions": disc_count
+        },
+        "overall_sentiment": avg_score,
+        "recent_topics": recent_items
+    }
+
 @app.post("/api/actions/sync")
-async def trigger_sync():
-    """Trigger background ingestion and clustering and broadcast notification."""
+async def trigger_sync(db: Session = Depends(get_db)):
+    """Trigger background ingestion and clustering and broadcast optimized notification."""
     try:
         from worker.tasks import run_pipeline_standalone
         count = run_pipeline_standalone()
+        snapshot = get_live_telemetry_snapshot(db)
         await manager.broadcast({
             "event": "sync_completed",
             "synced_articles": count,
-            "message": f"Successfully ingested and clustered {count} items."
+            "message": f"Successfully ingested and clustered {count} items.",
+            "telemetry": snapshot["counts"],
+            "overall_sentiment": snapshot["overall_sentiment"],
+            "recent_topics": snapshot["recent_topics"]
         })
-        return {"status": "success", "synced_articles": count}
+        return {"status": "success", "synced_articles": count, "telemetry": snapshot["counts"]}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 @app.post("/api/firehose/simulate")
-async def trigger_firehose():
+async def trigger_firehose(db: Session = Depends(get_db)):
     """Ingest simulated real-time micro-commentary from Bluesky Jetstream & Mastodon Fediverse."""
     try:
         from worker.tasks import ingest_social_firehose
         count = ingest_social_firehose()
+        snapshot = get_live_telemetry_snapshot(db)
         await manager.broadcast({
             "event": "firehose_pulse",
             "ingested_events": count,
-            "message": f"Live Firehose: Streamed {count} micro-commentary events from Bluesky & Mastodon."
+            "message": f"Live Firehose: Streamed {count} micro-commentary events from Bluesky & Mastodon.",
+            "telemetry": snapshot["counts"],
+            "overall_sentiment": snapshot["overall_sentiment"],
+            "recent_topics": snapshot["recent_topics"]
         })
-        return {"status": "success", "ingested_events": count}
+        return {"status": "success", "ingested_events": count, "telemetry": snapshot["counts"]}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 

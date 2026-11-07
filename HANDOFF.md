@@ -1,17 +1,17 @@
 # Omnifeed (Newz) - Session Handoff & Architecture Notes
 
-## Session Summary (v0.6.8)
-In this release iteration, we implemented custom feed ingestion pipeline processing and feed diagnostic metrics:
-1. **Dynamic Custom Feed Ingestion**:
-   - In `worker/tasks.py`, `run_pipeline_standalone()` dynamically queries all registered non-social HTTP feed sources from the database.
-   - Fetches and clusters custom feeds into topic stories with proper source attribution alongside Google, Yahoo, Reddit, Bluesky, and Mastodon.
-2. **Per-Source Productivity & Diagnostics**:
-   - Updated `GET /api/sources` and `backend/schemas.py` to calculate and return `article_count` for each registered channel.
-   - Enhanced the frontend Feed Management modal in `frontend/src/app/page.tsx` to render an article count diagnostic chip for each source card.
+## Session Summary (v0.6.9)
+In this release iteration, we optimized real-time WebSocket streaming payloads and implemented instantaneous client-side state merging:
+1. **Optimized WebSocket Broadcast Payloads**:
+   - In `backend/main.py`, added `get_live_telemetry_snapshot(db)` helper calculating current article, active topic, discussion, and overall sentiment metrics.
+   - Enhanced `trigger_sync()` and `trigger_firehose()` broadcast channels to package recent topic cluster deltas (`recent_topics`), live telemetry counts, and sentiment metrics into the WebSocket payload.
+2. **Instantaneous Client-Side State Merging**:
+   - In `frontend/src/app/page.tsx`, updated WebSocket `onmessage` handler to optimistically merge streamed topic deltas directly into the active topics list (on page 1) and update telemetry counters instantaneously without waiting for round-trip HTTP refetches.
+   - Background revalidation still occurs gracefully to maintain strict consistency across pages.
 3. **Automated Testing & Visual Verification**:
-   - Unit test `test_custom_feed_subscription_lifecycle` in `backend/tests/test_api.py` checks article count diagnostic returns (15/15 tests passing).
-   - Visual inspection verified with Playwright test `verify_feed_source_diagnostics.py` and screenshot `feed_source_diagnostics_verification.png`.
-   - Bumped single-source version in `VERSION.md` to v0.6.8.
+   - Added unit test `test_websocket_optimized_broadcast_payload` in `backend/tests/test_api.py` (16/16 tests passing).
+   - Executed Playwright verification test `verify_websocket_streaming_optimization.py` capturing screenshot `websocket_streaming_optimization_verification.png` confirming live WS connectivity, real-time firehose event toast, and delta topic rendering.
+   - Bumped single-source version in `VERSION.md` to v0.6.9.
 
 ## Next Steps for Successor Models:
 - Optional: Add custom user-created tag annotations for bookmarked clusters.

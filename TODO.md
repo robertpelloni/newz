@@ -40,3 +40,4 @@
 - [x] Offline topic detail caching and seamless cluster deep-dive modal fallback (v0.6.6).
 - [x] Custom RSS feed subscription endpoint and dashboard feed management modal (v0.6.7).
 - [x] Automated custom feed ingestion pipeline and per-source article productivity diagnostics (v0.6.8).
+- [x] Real-time WebSocket streaming optimization with delta payload streaming and instant live state merging (v0.6.9).
