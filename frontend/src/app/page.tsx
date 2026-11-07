@@ -357,10 +357,27 @@ export default function Dashboard() {
     try {
       const res = await fetch(`${API_BASE}/api/topics/${id}`);
       if (res.ok) {
-        setTopicDetail(await res.json());
+        const detailData = await res.json();
+        setTopicDetail(detailData);
+        try {
+          localStorage.setItem(`omnifeed_topic_detail_${id}`, JSON.stringify(detailData));
+        } catch (_) {}
+      } else {
+        // Fall back to localStorage cache if network request fails
+        const cachedDetail = localStorage.getItem(`omnifeed_topic_detail_${id}`);
+        if (cachedDetail) {
+          setTopicDetail(JSON.parse(cachedDetail));
+        }
       }
     } catch (e) {
       console.error("Error fetching topic detail:", e);
+      // Offline fallback: load cached topic detail from localStorage
+      try {
+        const cachedDetail = localStorage.getItem(`omnifeed_topic_detail_${id}`);
+        if (cachedDetail) {
+          setTopicDetail(JSON.parse(cachedDetail));
+        }
+      } catch (_) {}
     }
   };
 

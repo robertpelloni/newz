@@ -2,6 +2,13 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.6.6] - 2026-10-24
+### Added
+- Offline topic detail caching in `frontend/src/app/page.tsx`: automatically saves fetched topic intelligence clusters, extracted entities, correlated articles, and narrative timelines into `localStorage` (`omnifeed_topic_detail_<id>`).
+- Seamless offline modal viewing: clicking topic cluster cards while disconnected from the server falls back to locally cached cluster details with all narrative timelines and intelligence intact.
+- Verified offline topic modal rendering using Playwright test suite (`verify_offline_topic_detail_modal.py`) and visual screenshot inspection.
+- 14/14 backend unit/integration tests and automated offline access suite passing.
+
 ## [0.6.5] - 2026-10-24
 ### Added
 - Breaking news controversy indicators ("🔥 BREAKING") on high-controversy and high-velocity topic clusters.

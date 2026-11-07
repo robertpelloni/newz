@@ -1,19 +1,17 @@
 # Omnifeed (Newz) - Session Handoff & Architecture Notes
 
-## Session Summary (v0.6.5)
-In this release iteration, we added breaking news controversy indicators and synthesized Web Audio alert chimes:
-1. **Breaking News Controversy Badges**:
-   - Enhanced `backend/main.py` `/api/topics` endpoint with calculated `controversy_score`, `sentiment_score`, and boolean `is_breaking` indicator (flagging clusters with controversy >= 0.4 or source velocity >= 15).
-   - Displayed animated red "🔥 BREAKING" badges on high-controversy topic cards in `frontend/src/app/page.tsx`.
-2. **Zero-Dependency Web Audio API Alert Chimes**:
-   - Added `playChime()` in `frontend/src/app/page.tsx` generating a clean harmonic sine wave alert (587.33 Hz to 880 Hz ramp) using the standard browser Web Audio API without requiring any external MP3/WAV files.
-   - Added an interactive toggle ("🔔 Audio On" / "🔕 Audio") in the dashboard navigation bar.
-   - Automatically triggers auditory chimes on live WebSocket incoming events when enabled.
-3. **Automated Testing & Visual Verification**:
-   - Created `/home/jules/verification/verify_breaking_alert_and_audio.py` verifying breaking cluster detection and chime toggling.
-   - Inspected visual screenshot `breaking_alert_and_audio_verification.png`.
-   - Verified 14/14 backend unit/integration tests passing.
-   - Bumped single-source version in `VERSION.md` to v0.6.5.
+## Session Summary (v0.6.6)
+In this release iteration, we implemented offline topic detail caching and fallback in the presentation layer:
+1. **Offline Topic Detail Caching**:
+   - Enhanced `fetchTopicDetail` in `frontend/src/app/page.tsx` to automatically store fetched topic clusters in `localStorage` under `omnifeed_topic_detail_<id>`.
+   - When the user inspects a topic cluster modal while offline (or during backend disconnection), the client retrieves the cached cluster detail, maintaining access to extracted entities, narrative evolution timelines, AI summaries, and correlated articles.
+2. **End-to-End Visual Verification**:
+   - Built Playwright automated test `/home/jules/verification/verify_offline_topic_detail_modal.py` validating that opening a topic modal while offline correctly renders all timeline entries, entities, and summaries.
+   - Captured and visually confirmed `offline_topic_detail_modal_verification.png`.
+3. **Automated Test Suite**:
+   - All 14 backend unit/integration tests pass (`python3 -m pytest backend/tests/ -v`).
+   - Automated offline data access verification suite passes (`python3 scripts/test_offline_data_access.py`).
+   - Bumped single-source version to v0.6.6 in `VERSION.md`.
 
 ## Next Steps for Successor Models:
 - Optional: Add custom user-created tag annotations for bookmarked clusters.
