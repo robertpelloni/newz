@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.7.2] - 2026-10-24
+### Added
+- Synchronized Tauri desktop configuration bundle version to v0.7.2 in `frontend/src-tauri/tauri.conf.json`.
+- Enhanced `scripts/build_offline_distribution.sh` with automated schema, version, and icon validation for Tauri v2 native desktop builds.
+- Refined cross-platform runtime indicator badge in `frontend/src/app/page.tsx` with offline capability and sync queue guidance.
+- Verified offline caching and queue operations across PWA and desktop configurations via Playwright test suite (`verify_platform_offline.py` and `scripts/test_offline_data_access.py`).
+- All 16 backend unit and integration tests passing.
+
 ## [0.7.1] - 2026-10-24
 ### Added
 - Feed Source Health Diagnostics & Latency Probing endpoint `POST /api/sources/{id}/ping` in `backend/main.py`.

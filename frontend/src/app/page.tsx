@@ -661,10 +661,11 @@ export default function Dashboard() {
               v{status?.version || "0.6.0"}
             </span>
             <span
-              title={`Runtime environment: ${platformName} build`}
-              className="text-[10px] uppercase px-1.5 py-0.5 font-semibold bg-slate-800 text-slate-300 border border-slate-700 rounded"
+              title={`Runtime environment: ${platformName} mode (Offline Cache & Sync Queue Active)`}
+              className="text-[10px] uppercase px-1.5 py-0.5 font-semibold bg-slate-800 text-slate-300 border border-slate-700 rounded flex items-center space-x-1"
             >
-              {platformName}
+              <span className="text-cyan-400">●</span>
+              <span>{platformName}</span>
             </span>
           </div>
           <span className="text-xs text-slate-400 border-l border-slate-700 pl-4 hidden md:inline">

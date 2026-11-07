@@ -47,8 +47,20 @@ echo "3. Building Frontend for offline distribution..."
 cd "$REPO_ROOT/frontend"
 npm run build
 
-echo "4. Running PWA compliance checks..."
+echo "4. Validating Tauri desktop configuration and icons..."
+cd "$REPO_ROOT"
+python3 -c "
+import json, os
+with open('frontend/src-tauri/tauri.conf.json', 'r') as f:
+    conf = json.load(f)
+assert conf['productName'] == 'Omnifeed'
+assert conf['version'] == '0.7.2'
+assert os.path.exists('frontend/src-tauri/icons/icon.png')
+print('Tauri config valid: ' + conf['productName'] + ' v' + conf['version'])
+"
+
+echo "5. Running PWA compliance checks..."
 cd "$REPO_ROOT"
 python3 "$REPO_ROOT/scripts/validate_pwa.py" frontend/public/sw.js frontend/public/manifest.json
 
-echo "=== PWA & Offline Distribution Ready ==="
+echo "=== PWA & Tauri Desktop Offline Distribution Ready ==="
