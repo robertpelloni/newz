@@ -197,3 +197,21 @@ def test_feed_source_health_ping():
     assert data["status"] in ["healthy", "degraded", "unreachable"]
     assert "latency_ms" in data
     assert isinstance(data["latency_ms"], float)
+
+def test_websocket_immediate_snapshot_and_request_action():
+    with client.websocket_connect("/api/ws/feed") as websocket:
+        # 1. First frame sent immediately upon connection should contain handshake and telemetry snapshot
+        initial = websocket.receive_json()
+        assert initial["event"] == "connected"
+        assert "telemetry" in initial
+        assert "articles" in initial["telemetry"]
+        assert "topics" in initial["telemetry"]
+        assert "recent_topics" in initial
+
+        # 2. Send request_snapshot action
+        websocket.send_text('{"action": "request_snapshot"}')
+        reply = websocket.receive_json()
+        assert reply["event"] == "telemetry_snapshot"
+        assert "telemetry" in reply
+        assert "recent_topics" in reply
+        assert "overall_sentiment" in reply

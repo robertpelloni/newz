@@ -75,22 +75,89 @@ def get_db():
     finally:
         db.close()
 
+def get_live_telemetry_snapshot(db: Session) -> dict:
+    """Helper to extract lightweight current system telemetry and recent topic deltas."""
+    art_count = db.query(models.Article).count()
+    top_count = db.query(models.Topic).count()
+    disc_count = db.query(models.Discussion).count()
+
+    # Calculate quick sentiment
+    sentiments = db.query(models.Sentiment).order_by(models.Sentiment.id.desc()).limit(50).all()
+    scores = [s.overall_score for s in sentiments if s.overall_score is not None]
+    avg_score = round(sum(scores) / len(scores), 2) if scores else 0.0
+
+    # Get 5 most recent topics
+    recent_topics = db.query(models.Topic).order_by(models.Topic.last_updated.desc()).limit(5).all()
+    recent_items = []
+    for t in recent_topics:
+        count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
+        latest_sentiment = db.query(models.Sentiment).filter(models.Sentiment.topic_id == t.id).order_by(models.Sentiment.id.desc()).first()
+        controversy = 0.0
+        sentiment = 0.0
+        if latest_sentiment and latest_sentiment.breakdown_json:
+            controversy = latest_sentiment.breakdown_json.get("controversy", 0.0)
+            sentiment = latest_sentiment.overall_score or 0.0
+        recent_items.append({
+            "id": t.id,
+            "title": t.title,
+            "summary": t.summary,
+            "category": t.category,
+            "first_seen": t.first_seen.isoformat() if t.first_seen else None,
+            "last_updated": t.last_updated.isoformat() if t.last_updated else None,
+            "article_count": count,
+            "controversy_score": round(controversy, 2),
+            "sentiment_score": round(sentiment, 2),
+            "is_breaking": (controversy >= 0.4 or count >= 15),
+        })
+
+    return {
+        "counts": {
+            "articles": art_count,
+            "topics": top_count,
+            "discussions": disc_count
+        },
+        "overall_sentiment": avg_score,
+        "recent_topics": recent_items
+    }
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Omnifeed API", "version": get_app_version()}
 
 @app.websocket("/api/ws/feed")
-async def websocket_feed_endpoint(websocket: WebSocket):
+async def websocket_feed_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
     """Real-time streaming channel for new topics, feed updates, and live alerts."""
     await manager.connect(websocket)
     try:
-        # Send initial handshake confirmation
-        await websocket.send_json({"event": "connected", "message": "Omnifeed live stream active"})
+        # Send initial handshake confirmation along with immediate telemetry snapshot
+        snapshot = get_live_telemetry_snapshot(db)
+        await websocket.send_json({
+            "event": "connected",
+            "message": "Omnifeed live stream active",
+            "telemetry": snapshot["counts"],
+            "overall_sentiment": snapshot["overall_sentiment"],
+            "recent_topics": snapshot["recent_topics"]
+        })
         while True:
-            # Keep connection alive and accept incoming pings or queries
-            data = await websocket.receive_text()
-            if data == "ping":
+            # Keep connection alive and accept incoming pings, actions, or telemetry requests
+            raw_data = await websocket.receive_text()
+            if raw_data == "ping":
                 await websocket.send_json({"event": "pong"})
+            else:
+                try:
+                    payload = json.loads(raw_data)
+                    action = payload.get("action")
+                    if action == "request_snapshot":
+                        curr_snapshot = get_live_telemetry_snapshot(db)
+                        await websocket.send_json({
+                            "event": "telemetry_snapshot",
+                            "telemetry": curr_snapshot["counts"],
+                            "overall_sentiment": curr_snapshot["overall_sentiment"],
+                            "recent_topics": curr_snapshot["recent_topics"]
+                        })
+                except Exception:
+                    # Ignore non-json raw text frames
+                    pass
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception:
@@ -437,51 +504,6 @@ def get_sentiment_pulse(db: Session = Depends(get_db)):
         "negative_ratio": round(neg / total, 2),
         "neutral_ratio": round(neu / total, 2),
         "sample_size": len(scores)
-    }
-
-def get_live_telemetry_snapshot(db: Session) -> dict:
-    """Helper to extract lightweight current system telemetry and recent topic deltas."""
-    art_count = db.query(models.Article).count()
-    top_count = db.query(models.Topic).count()
-    disc_count = db.query(models.Discussion).count()
-
-    # Calculate quick sentiment
-    sentiments = db.query(models.Sentiment).order_by(models.Sentiment.id.desc()).limit(50).all()
-    scores = [s.overall_score for s in sentiments if s.overall_score is not None]
-    avg_score = round(sum(scores) / len(scores), 2) if scores else 0.0
-
-    # Get 5 most recent topics
-    recent_topics = db.query(models.Topic).order_by(models.Topic.last_updated.desc()).limit(5).all()
-    recent_items = []
-    for t in recent_topics:
-        count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
-        latest_sentiment = db.query(models.Sentiment).filter(models.Sentiment.topic_id == t.id).order_by(models.Sentiment.id.desc()).first()
-        controversy = 0.0
-        sentiment = 0.0
-        if latest_sentiment and latest_sentiment.breakdown_json:
-            controversy = latest_sentiment.breakdown_json.get("controversy", 0.0)
-            sentiment = latest_sentiment.overall_score or 0.0
-        recent_items.append({
-            "id": t.id,
-            "title": t.title,
-            "summary": t.summary,
-            "category": t.category,
-            "first_seen": t.first_seen.isoformat() if t.first_seen else None,
-            "last_updated": t.last_updated.isoformat() if t.last_updated else None,
-            "article_count": count,
-            "controversy_score": round(controversy, 2),
-            "sentiment_score": round(sentiment, 2),
-            "is_breaking": (controversy >= 0.4 or count >= 15),
-        })
-
-    return {
-        "counts": {
-            "articles": art_count,
-            "topics": top_count,
-            "discussions": disc_count
-        },
-        "overall_sentiment": avg_score,
-        "recent_topics": recent_items
     }
 
 @app.post("/api/actions/sync")

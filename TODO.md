@@ -45,3 +45,4 @@
 - [x] Feed source health diagnostics and real-time endpoint latency probing (v0.7.1).
 - [x] Unified PWA and Tauri desktop offline bundle validation (v0.7.2).
 - [x] Implement IndexedDB offline intelligence vault and Offline Storage Governance modal with JSON vault export and cache purging (v0.7.3).
+- [x] Implement bi-directional WebSocket telemetry snapshots and continuous client-side IndexedDB ingestion syncing (v0.7.4).

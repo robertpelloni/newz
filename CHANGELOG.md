@@ -2,6 +2,13 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.7.4] - 2026-11-07
+### Added
+- Bi-directional WebSocket real-time streaming with immediate telemetry snapshots and topic delta delivery upon client connection handshake (`/api/ws/feed`).
+- Interactive WebSocket client commands supporting `{"action": "request_snapshot"}` for on-demand live state retrieval.
+- Automated client-side IndexedDB synchronization on live WebSocket delta events, keeping the offline intelligence vault continuously primed with incoming stories.
+- Automated backend unit test `test_websocket_immediate_snapshot_and_request_action` validating WebSocket handshake, payload structure, and client request actions.
+
 ## [0.7.3] - 2026-11-07
 ### Added
 - Client-side IndexedDB persistent storage vault (`frontend/src/utils/offlineStore.ts`) providing robust offline storage for clustered topics, detailed articles, and storage telemetry metrics.
