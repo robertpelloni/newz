@@ -338,9 +338,10 @@ def get_topics(
     page_size: int = Query(12, ge=1, le=100),
     category: Optional[str] = None,
     q: Optional[str] = None,
+    sort_by: str = Query("latest", pattern="^(latest|articles|controversy|sentiment)$"),
     db: Session = Depends(get_db)
 ):
-    """Retrieve paginated topics with search and category filtering."""
+    """Retrieve paginated topics with search, category filtering, and multi-criteria sorting."""
     query = db.query(models.Topic)
     if category and category.lower() != "all":
         query = query.filter(models.Topic.category.ilike(f"%{category}%"))
@@ -348,16 +349,12 @@ def get_topics(
         query = query.filter(models.Topic.title.ilike(f"%{q}%") | models.Topic.summary.ilike(f"%{q}%"))
 
     total = query.count()
-    skip = (page - 1) * page_size
-    topics = query.order_by(models.Topic.last_updated.desc()).offset(skip).limit(page_size).all()
+    topics = query.all()
 
-    total_pages = max(1, (total + page_size - 1) // page_size)
-
-    # Eagerly prepare response
+    # Pre-build topic items with article count and sentiment attributes for accurate multi-criteria sorting
     items = []
     for t in topics:
         article_count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
-        # Query latest sentiment score/controversy
         latest_sentiment = db.query(models.Sentiment).filter(models.Sentiment.topic_id == t.id).order_by(models.Sentiment.id.desc()).first()
         controversy_score = 0.0
         sentiment_score = 0.0
@@ -378,12 +375,27 @@ def get_topics(
             "is_breaking": (controversy_score >= 0.4 or article_count >= 15),
         })
 
+    # Sort items according to requested sort_by criterion
+    if sort_by == "articles":
+        items.sort(key=lambda x: (x["article_count"], x["last_updated"] or ""), reverse=True)
+    elif sort_by == "controversy":
+        items.sort(key=lambda x: (x["controversy_score"], x["article_count"]), reverse=True)
+    elif sort_by == "sentiment":
+        items.sort(key=lambda x: abs(x["sentiment_score"]), reverse=True)
+    else:  # "latest" default
+        items.sort(key=lambda x: x["last_updated"] or "", reverse=True)
+
+    skip = (page - 1) * page_size
+    paginated_items = items[skip:skip + page_size]
+    total_pages = max(1, (total + page_size - 1) // page_size)
+
     return {
-        "items": items,
+        "items": paginated_items,
         "total": total,
         "page": page,
         "page_size": page_size,
-        "total_pages": total_pages
+        "total_pages": total_pages,
+        "sort_by": sort_by
     }
 
 @app.get("/api/topics/export")

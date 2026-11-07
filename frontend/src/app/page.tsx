@@ -98,6 +98,7 @@ export default function Dashboard() {
   const [pulse, setPulse] = useState<SentimentPulse | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [sortBy, setSortBy] = useState<string>("latest");
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
   const [topicDetail, setTopicDetail] = useState<TopicDetail | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -394,15 +395,15 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Reset page to 1 when filters change
+  // Reset page to 1 when filters or sort change
   useEffect(() => {
     setPage(1);
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, searchQuery, sortBy]);
 
-  // Fetch topics whenever category, search, or pagination changes
+  // Fetch topics whenever category, search, sort, or pagination changes
   useEffect(() => {
     fetchTopics();
-  }, [activeCategory, searchQuery, page, pageSize]);
+  }, [activeCategory, searchQuery, sortBy, page, pageSize]);
 
   // Fetch deep-dive modal
   useEffect(() => {
@@ -575,6 +576,7 @@ export default function Dashboard() {
       const url = new URL(`${API_BASE}/api/topics`);
       url.searchParams.append("page", page.toString());
       url.searchParams.append("page_size", pageSize.toString());
+      url.searchParams.append("sort_by", sortBy);
       if (activeCategory !== "All") url.searchParams.append("category", activeCategory);
       if (searchQuery.trim()) url.searchParams.append("q", searchQuery.trim());
 
@@ -635,6 +637,17 @@ export default function Dashboard() {
               (t.title && t.title.toLowerCase().includes(q)) ||
               (t.summary && t.summary.toLowerCase().includes(q))
           );
+        }
+
+        // Apply offline sorting
+        if (sortBy === "articles") {
+          filtered.sort((a, b) => (b.article_count || 0) - (a.article_count || 0));
+        } else if (sortBy === "controversy") {
+          filtered.sort((a, b) => (b.controversy_score || 0) - (a.controversy_score || 0));
+        } else if (sortBy === "sentiment") {
+          filtered.sort((a, b) => Math.abs(b.sentiment_score || 0) - Math.abs(a.sentiment_score || 0));
+        } else {
+          filtered.sort((a, b) => (b.last_updated || "").localeCompare(a.last_updated || ""));
         }
 
         const total = filtered.length;
@@ -1106,8 +1119,8 @@ export default function Dashboard() {
 
         {/* Global Controls & Filters */}
         <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {/* Real-time Search */}
-          <div className="relative flex-1">
+          {/* Real-time Search & Sort Controls */}
+          <div className="flex flex-col sm:flex-row items-center gap-2 flex-1">
             <input
               type="text"
               value={searchQuery}
@@ -1115,6 +1128,17 @@ export default function Dashboard() {
               placeholder="Search topics, headlines, or keywords..."
               className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
             />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              title="Sort topics by recency, coverage density, controversy, or polarity"
+              className="w-full sm:w-auto bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-semibold text-cyan-300 focus:outline-none focus:border-cyan-500 transition"
+            >
+              <option value="latest">Sort: 🕒 Recent</option>
+              <option value="articles">Sort: 📈 Most Active</option>
+              <option value="controversy">Sort: 🔥 Controversy</option>
+              <option value="sentiment">Sort: ⚡ Polarity</option>
+            </select>
           </div>
 
           {/* Category Tabs & Bookmarks */}

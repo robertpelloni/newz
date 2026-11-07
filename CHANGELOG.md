@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.8.1] - 2026-11-07
+### Added
+- Multi-criteria topic sorting in backend API (`GET /api/topics?sort_by=...`), supporting ordering by recent updates (`latest`), article volume (`articles`), controversy level (`controversy`), and sentiment extremity (`sentiment`).
+- Interactive sort selector dropdown in the global controls bar of `frontend/src/app/page.tsx`, supporting both online dynamic API sorting and offline IndexedDB client-side sorting.
+- Automated unit test `test_get_topics_multi_criteria_sorting` in `backend/tests/test_api.py` validating sort ordering across all criteria (19/19 tests passing).
+
 ## [0.8.0] - 2026-11-07
 ### Added
 - Multi-tier bookmark persistence layer synchronizing saved reading list IDs across both IndexedDB (`metrics_store`) and `localStorage` (`omnifeed_bookmarks`).

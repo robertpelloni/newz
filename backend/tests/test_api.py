@@ -227,3 +227,18 @@ def test_feed_sources_bulk_health_ping():
         assert "status" in s
         assert "latency_ms" in s
         assert s["status"] in ["healthy", "degraded", "unreachable"]
+
+def test_get_topics_multi_criteria_sorting():
+    for sort_param in ["latest", "articles", "controversy", "sentiment"]:
+        res = client.get(f"/api/topics?sort_by={sort_param}&page_size=5")
+        assert res.status_code == 200
+        data = res.json()
+        assert "items" in data
+        assert "sort_by" in data
+        assert data["sort_by"] == sort_param
+        items = data["items"]
+        if len(items) >= 2:
+            if sort_param == "articles":
+                assert items[0]["article_count"] >= items[1]["article_count"]
+            elif sort_param == "controversy":
+                assert items[0]["controversy_score"] >= items[1]["controversy_score"]
