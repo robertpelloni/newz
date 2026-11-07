@@ -68,6 +68,14 @@ interface TopicDetail {
   }>;
 }
 
+interface FeedSource {
+  id: number;
+  name: string;
+  type: string;
+  url: string;
+  active: boolean;
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function Dashboard() {
@@ -97,6 +105,15 @@ export default function Dashboard() {
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
   const [platformName, setPlatformName] = useState<string>("Web");
   const [audioAlertsEnabled, setAudioAlertsEnabled] = useState<boolean>(false);
+
+  // Custom Feed Management State
+  const [showFeedsModal, setShowFeedsModal] = useState<boolean>(false);
+  const [feedSources, setFeedSources] = useState<FeedSource[]>([]);
+  const [newFeedName, setNewFeedName] = useState<string>("");
+  const [newFeedUrl, setNewFeedUrl] = useState<string>("");
+  const [newFeedType, setNewFeedType] = useState<string>("tech");
+  const [feedSubmitError, setFeedSubmitError] = useState<string | null>(null);
+  const [isAddingFeed, setIsAddingFeed] = useState<boolean>(false);
 
   const categories = ["All", "General", "Technology", "Business", "Politics", "Science", "Entertainment"];
 
@@ -294,14 +311,74 @@ export default function Dashboard() {
 
   const fetchSystemData = async () => {
     try {
-      const [resStatus, resPulse] = await Promise.all([
+      const [resStatus, resPulse, resSources] = await Promise.all([
         fetch(`${API_BASE}/api/system/status`),
-        fetch(`${API_BASE}/api/sentiment/pulse`)
+        fetch(`${API_BASE}/api/sentiment/pulse`),
+        fetch(`${API_BASE}/api/sources`)
       ]);
       if (resStatus.ok) setStatus(await resStatus.json());
       if (resPulse.ok) setPulse(await resPulse.json());
+      if (resSources.ok) {
+        const sourcesData = await resSources.json();
+        setFeedSources(sourcesData);
+        localStorage.setItem("omnifeed_sources_cache", JSON.stringify(sourcesData));
+      }
     } catch (e) {
       console.error("Error fetching status or pulse:", e);
+      const cached = localStorage.getItem("omnifeed_sources_cache");
+      if (cached) {
+        try { setFeedSources(JSON.parse(cached)); } catch {}
+      }
+    }
+  };
+
+  const handleAddFeed = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFeedSubmitError(null);
+    if (!newFeedName.trim() || !newFeedUrl.trim()) {
+      setFeedSubmitError("Please specify both a feed name and a valid URL.");
+      return;
+    }
+    setIsAddingFeed(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/sources`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newFeedName.trim(),
+          url: newFeedUrl.trim(),
+          type: newFeedType
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setFeedSubmitError(err.detail || "Failed to register feed.");
+      } else {
+        const created = await res.json();
+        const updated = [...feedSources.filter(s => s.id !== created.id), created];
+        setFeedSources(updated);
+        localStorage.setItem("omnifeed_sources_cache", JSON.stringify(updated));
+        setNewFeedName("");
+        setNewFeedUrl("");
+      }
+    } catch (e) {
+      setFeedSubmitError("Network error: Could not reach feed registry.");
+    } finally {
+      setIsAddingFeed(false);
+    }
+  };
+
+  const handleDeleteFeed = async (id: number) => {
+    if (!confirm("Are you sure you want to unsubscribe from this feed source?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/sources/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        const updated = feedSources.filter(s => s.id !== id);
+        setFeedSources(updated);
+        localStorage.setItem("omnifeed_sources_cache", JSON.stringify(updated));
+      }
+    } catch (e) {
+      console.error("Failed to delete feed:", e);
     }
   };
 
@@ -566,6 +643,20 @@ export default function Dashboard() {
             }`}
           >
             {audioAlertsEnabled ? "🔔 Audio On" : "🔕 Audio"}
+          </button>
+
+          {/* Manage Feeds Button */}
+          <button
+            onClick={() => setShowFeedsModal(true)}
+            title="Manage and subscribe to custom RSS/Atom feed sources"
+            className="px-2.5 py-1.5 text-xs font-semibold rounded border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex items-center space-x-1"
+          >
+            <span>📡 Feeds</span>
+            {feedSources.length > 0 && (
+              <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.2 rounded-full font-bold">
+                {feedSources.length}
+              </span>
+            )}
           </button>
 
           {/* OLED Contrast Switch */}
@@ -1081,6 +1172,130 @@ export default function Dashboard() {
                 Loading cluster intelligence deep dive...
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Feed Management Modal */}
+      {showFeedsModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-6 shadow-2xl relative my-8">
+            <button
+              onClick={() => setShowFeedsModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 transition text-xs"
+            >
+              ✕ Close
+            </button>
+
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center space-x-2">
+                <span>📡 Feed Sources & Subscriptions</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Configure news wires, custom RSS/Atom feeds, and social ingestion channels.
+              </p>
+            </div>
+
+            {/* Subscribe Form */}
+            <form onSubmit={handleAddFeed} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+              <h4 className="text-xs font-bold uppercase text-slate-300 tracking-wider">
+                Subscribe to New Feed
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">
+                    Feed Name / Publication
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Ars Technica"
+                    value={newFeedName}
+                    onChange={(e) => setNewFeedName(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">
+                    Feed Type
+                  </label>
+                  <select
+                    value={newFeedType}
+                    onChange={(e) => setNewFeedType(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="tech">Technology</option>
+                    <option value="general">General / Mainstream</option>
+                    <option value="business">Business</option>
+                    <option value="politics">Politics</option>
+                    <option value="science">Science</option>
+                    <option value="social">Social Media</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">
+                  RSS / Atom Feed URL
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://example.com/feed.xml"
+                  value={newFeedUrl}
+                  onChange={(e) => setNewFeedUrl(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              {feedSubmitError && (
+                <div className="text-xs text-rose-400 bg-rose-950/40 border border-rose-900 p-2 rounded">
+                  {feedSubmitError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isAddingFeed}
+                className="w-full py-1.5 text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white rounded transition shadow disabled:opacity-50"
+              >
+                {isAddingFeed ? "Subscribing..." : "➕ Subscribe to Feed"}
+              </button>
+            </form>
+
+            {/* Active Sources List */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">
+                Active Ingestion Channels ({feedSources.length})
+              </h4>
+              <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                {feedSources.map((source) => (
+                  <div
+                    key={source.id}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-xs"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold text-slate-200">{source.name}</span>
+                        <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 bg-slate-900 text-cyan-400 rounded border border-slate-800">
+                          {source.type}
+                        </span>
+                        <span className="text-[10px] text-emerald-400">● Active</span>
+                      </div>
+                      {source.url && (
+                        <p className="text-[11px] text-slate-500 truncate max-w-sm">{source.url}</p>
+                      )}
+                    </div>
+                    {source.id > 5 && (
+                      <button
+                        onClick={() => handleDeleteFeed(source.id)}
+                        title="Unsubscribe from feed source"
+                        className="text-rose-400 hover:text-rose-300 p-1.5 rounded hover:bg-rose-950/40 transition"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}

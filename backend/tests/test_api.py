@@ -124,3 +124,37 @@ def test_chronological_timeline_metadata_and_ordering():
     for marker in timeline:
         assert "headline" in marker
         assert "source" in marker
+
+def test_custom_feed_subscription_lifecycle():
+    # 1. Create a custom feed source
+    payload = {
+        "name": "MIT Technology Review",
+        "type": "tech",
+        "url": "https://www.technologyreview.com/feed/"
+    }
+    create_res = client.post("/api/sources", json=payload)
+    assert create_res.status_code == 200
+    created = create_res.json()
+    assert created["name"] == "MIT Technology Review"
+    assert created["url"] == "https://www.technologyreview.com/feed/"
+    source_id = created["id"]
+
+    # 2. Check source appears in GET /api/sources
+    get_res = client.get("/api/sources")
+    assert get_res.status_code == 200
+    sources = get_res.json()
+    assert any(s["id"] == source_id for s in sources)
+
+    # 3. Duplicate insertion returns existing source
+    dup_res = client.post("/api/sources", json=payload)
+    assert dup_res.status_code == 200
+    assert dup_res.json()["id"] == source_id
+
+    # 4. Delete the custom source
+    del_res = client.delete(f"/api/sources/{source_id}")
+    assert del_res.status_code == 200
+    assert del_res.json()["status"] == "success"
+
+    # 5. Check source is no longer present
+    get_after = client.get("/api/sources")
+    assert not any(s["id"] == source_id for s in get_after.json())

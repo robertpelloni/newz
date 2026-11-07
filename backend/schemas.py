@@ -36,6 +36,20 @@ class SentimentResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class SourceCreate(BaseModel):
+    name: str
+    type: Optional[str] = "rss"
+    url: str
+
+class SourceResponse(BaseModel):
+    id: int
+    name: str
+    type: str
+    url: str
+    active: bool = True
+
+    model_config = ConfigDict(from_attributes=True)
+
 class TopicDeepDive(BaseModel):
     topic: TopicResponse
     articles: List[ArticleResponse]

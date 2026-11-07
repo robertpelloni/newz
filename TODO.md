@@ -38,3 +38,4 @@
 - [x] Category tag filtering for saved reading list bookmarks (v0.6.4).
 - [x] Breaking news controversy badges and Web Audio alert chimes (v0.6.5).
 - [x] Offline topic detail caching and seamless cluster deep-dive modal fallback (v0.6.6).
+- [x] Custom RSS feed subscription endpoint and dashboard feed management modal (v0.6.7).

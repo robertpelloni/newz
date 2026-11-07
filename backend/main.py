@@ -119,16 +119,60 @@ def get_sources(db: Session = Depends(get_db)):
     """List all registered news and social feed sources."""
     sources = db.query(models.Source).all()
     if not sources:
-        # Default source catalogue
+        # Seed and return default catalogue if empty
         defaults = [
-            {"id": 1, "name": "Google News", "type": "mainstream", "url": "https://news.google.com/rss", "active": True},
-            {"id": 2, "name": "Yahoo News", "type": "mainstream", "url": "https://news.yahoo.com/rss", "active": True},
-            {"id": 3, "name": "Hacker News", "type": "aggregator", "url": "https://hacker-news.firebaseio.com/v0", "active": True},
-            {"id": 4, "name": "Reddit (r/news, r/tech)", "type": "social", "url": "https://reddit.com/r/news/.json", "active": True},
-            {"id": 5, "name": "MSN News", "type": "mainstream", "url": "https://rss.msn.com", "active": True},
+            {"name": "Google News", "type": "mainstream", "url": "https://news.google.com/rss"},
+            {"name": "Yahoo News", "type": "mainstream", "url": "https://news.yahoo.com/rss"},
+            {"name": "Hacker News", "type": "aggregator", "url": "https://hacker-news.firebaseio.com/v0"},
+            {"name": "Reddit (r/news, r/tech)", "type": "social", "url": "https://reddit.com/r/news/.json"},
+            {"name": "MSN News", "type": "mainstream", "url": "https://rss.msn.com"},
         ]
-        return defaults
+        created = []
+        for d in defaults:
+            s = models.Source(name=d["name"], type=d["type"], url=d["url"])
+            db.add(s)
+            created.append(s)
+        try:
+            db.commit()
+            for s in created:
+                db.refresh(s)
+            return [{"id": s.id, "name": s.name, "type": s.type, "url": s.url, "active": True} for s in created]
+        except Exception:
+            db.rollback()
+            return [{"id": i + 1, "name": d["name"], "type": d["type"], "url": d["url"], "active": True} for i, d in enumerate(defaults)]
+
     return [{"id": s.id, "name": s.name, "type": s.type, "url": s.url, "active": True} for s in sources]
+
+@app.post("/api/sources", response_model=schemas.SourceResponse)
+def create_source(source_in: schemas.SourceCreate, db: Session = Depends(get_db)):
+    """Register a new custom RSS/Atom feed source."""
+    if not source_in.name.strip() or not source_in.url.strip():
+        raise HTTPException(status_code=400, detail="Name and URL are required.")
+
+    # Check for existing feed with same URL
+    existing = db.query(models.Source).filter(models.Source.url == source_in.url.strip()).first()
+    if existing:
+        return existing
+
+    new_source = models.Source(
+        name=source_in.name.strip(),
+        type=source_in.type.strip() if source_in.type else "rss",
+        url=source_in.url.strip()
+    )
+    db.add(new_source)
+    db.commit()
+    db.refresh(new_source)
+    return new_source
+
+@app.delete("/api/sources/{source_id}")
+def delete_source(source_id: int, db: Session = Depends(get_db)):
+    """Remove a registered feed source."""
+    source = db.query(models.Source).filter(models.Source.id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Feed source not found.")
+    db.delete(source)
+    db.commit()
+    return {"status": "success", "message": f"Source {source_id} removed successfully."}
 
 @app.get("/api/topics")
 def get_topics(

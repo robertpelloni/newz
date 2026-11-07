@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.6.7] - 2026-10-24
+### Added
+- Custom feed subscription endpoints (`POST /api/sources` and `DELETE /api/sources/{id}`) in `backend/main.py`.
+- Dynamic Feed Sources & Subscriptions modal dialog in `frontend/src/app/page.tsx` with category type dropdown, subscription form, real-time channel counts, and unsubscribe actions.
+- Local storage fallback for feed catalogue cache (`omnifeed_sources_cache`) during offline browsing.
+- Unit test `test_custom_feed_subscription_lifecycle` in `backend/tests/test_api.py` (15/15 tests passing).
+- Verified feed subscription workflow and modal UI via Playwright test (`verify_feed_subscription_modal.py`).
+
 ## [0.6.6] - 2026-10-24
 ### Added
 - Offline topic detail caching in `frontend/src/app/page.tsx`: automatically saves fetched topic intelligence clusters, extracted entities, correlated articles, and narrative timelines into `localStorage` (`omnifeed_topic_detail_<id>`).
