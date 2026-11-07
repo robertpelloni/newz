@@ -113,6 +113,44 @@ export async function clearOfflineIndexedDB(): Promise<void> {
   }
 }
 
+export async function importOfflineVault(vaultData: { topics?: any[]; details?: any[] }): Promise<{ topicsImported: number; detailsImported: number }> {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction([TOPICS_STORE, DETAILS_STORE], 'readwrite');
+    const topicsStore = tx.objectStore(TOPICS_STORE);
+    const detailsStore = tx.objectStore(DETAILS_STORE);
+
+    let topicsImported = 0;
+    let detailsImported = 0;
+
+    if (Array.isArray(vaultData.topics)) {
+      for (const t of vaultData.topics) {
+        if (t && t.id) {
+          topicsStore.put(t);
+          topicsImported += 1;
+        }
+      }
+    }
+
+    if (Array.isArray(vaultData.details)) {
+      for (const d of vaultData.details) {
+        if (d && d.id) {
+          detailsStore.put(d);
+          detailsImported += 1;
+        }
+      }
+    }
+
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve({ topicsImported, detailsImported });
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.error('Failed to import offline vault:', err);
+    throw err;
+  }
+}
+
 export async function getOfflineStorageMetrics(): Promise<{ topicCount: number; detailCount: number; estimatedBytes: number }> {
   try {
     const db = await openDatabase();

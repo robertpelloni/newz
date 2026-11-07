@@ -8,6 +8,7 @@ import {
   getTopicDetailFromIndexedDB,
   clearOfflineIndexedDB,
   getOfflineStorageMetrics,
+  importOfflineVault,
 } from "../utils/offlineStore";
 
 interface Topic {
@@ -509,17 +510,25 @@ export default function Dashboard() {
       const res = await fetch(`${API_BASE}/api/sources/${id}/ping`, { method: "POST" });
       if (res.ok) {
         const data = await res.json();
-        setFeedSources((prev) =>
-          prev.map((s) =>
+        setFeedSources((prev) => {
+          const updated = prev.map((s) =>
             s.id === id ? { ...s, status: data.status, latency_ms: data.latency_ms } : s
-          )
-        );
+          );
+          try {
+            localStorage.setItem("omnifeed_sources_cache", JSON.stringify(updated));
+          } catch (_) {}
+          return updated;
+        });
       }
     } catch (e) {
       console.error("Feed ping failed:", e);
-      setFeedSources((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, status: "unreachable" } : s))
-      );
+      setFeedSources((prev) => {
+        const updated = prev.map((s) => (s.id === id ? { ...s, status: "unreachable" } : s));
+        try {
+          localStorage.setItem("omnifeed_sources_cache", JSON.stringify(updated));
+        } catch (_) {}
+        return updated;
+      });
     } finally {
       setPingingSourceId(null);
     }
@@ -1516,6 +1525,32 @@ export default function Dashboard() {
                 >
                   <span>🧹 Purge Offline Cache</span>
                 </button>
+
+                <label className="px-3 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-800/80 rounded transition flex items-center space-x-1.5 cursor-pointer">
+                  <span>📥 Import Vault</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        const text = await file.text();
+                        const parsed = JSON.parse(text);
+                        const result = await importOfflineVault(parsed);
+                        fetchTopics();
+                        const metrics = await getOfflineStorageMetrics();
+                        setOfflineMetrics(metrics);
+                        setLiveAlert(`Vault imported: ${result.topicsImported} topics restored.`);
+                        setTimeout(() => setLiveAlert(null), 3000);
+                      } catch (err) {
+                        alert("Failed to import vault file. Ensure it is a valid JSON vault.");
+                      }
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
 
                 <button
                   onClick={async () => {

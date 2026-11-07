@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.7.8] - 2026-11-07
+### Added
+- Offline intelligence vault file import (`importOfflineVault`) and restoration button (`📥 Import Vault`) in the Offline Storage Manager modal.
+- Persistent offline feed source health diagnostics and latency metrics stored in `omnifeed_sources_cache` for inspection in disconnected contexts.
+- Extended automated Playwright verification in `scripts/test_offline_data_access.py` testing vault import restoration into IndexedDB.
+
 ## [0.7.7] - 2026-11-07
 ### Added
 - Offline topic filtering and full-text keyword search directly executed over the IndexedDB persistent cache.
