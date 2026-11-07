@@ -44,3 +44,4 @@
 - [x] Finalize PWA build process, Service Worker Background Sync (`sync-omnifeed-queue`), and offline sync documentation (v0.7.0).
 - [x] Feed source health diagnostics and real-time endpoint latency probing (v0.7.1).
 - [x] Unified PWA and Tauri desktop offline bundle validation (v0.7.2).
+- [x] Implement IndexedDB offline intelligence vault and Offline Storage Governance modal with JSON vault export and cache purging (v0.7.3).

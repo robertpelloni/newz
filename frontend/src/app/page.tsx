@@ -1,6 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import {
+  saveTopicsToIndexedDB,
+  getTopicsFromIndexedDB,
+  saveTopicDetailToIndexedDB,
+  getTopicDetailFromIndexedDB,
+  clearOfflineIndexedDB,
+  getOfflineStorageMetrics,
+} from "../utils/offlineStore";
 
 interface Topic {
   id: number;
@@ -117,6 +125,14 @@ export default function Dashboard() {
   const [newFeedType, setNewFeedType] = useState<string>("tech");
   const [feedSubmitError, setFeedSubmitError] = useState<string | null>(null);
   const [isAddingFeed, setIsAddingFeed] = useState<boolean>(false);
+
+  // Offline Cache Management State
+  const [showOfflineModal, setShowOfflineModal] = useState<boolean>(false);
+  const [offlineMetrics, setOfflineMetrics] = useState<{ topicCount: number; detailCount: number; estimatedBytes: number }>({
+    topicCount: 0,
+    detailCount: 0,
+    estimatedBytes: 0,
+  });
 
   const categories = ["All", "General", "Technology", "Business", "Politics", "Science", "Entertainment"];
 
@@ -461,6 +477,7 @@ export default function Dashboard() {
           setTotalPages(data.total_pages);
           try {
             localStorage.setItem("omnifeed_cached_topics", JSON.stringify(data));
+            await saveTopicsToIndexedDB(data.items);
           } catch (_) {}
         } else if (Array.isArray(data)) {
           setTopics(data);
@@ -468,20 +485,28 @@ export default function Dashboard() {
           setTotalPages(1);
           try {
             localStorage.setItem("omnifeed_cached_topics", JSON.stringify({ items: data, total: data.length, total_pages: 1 }));
+            await saveTopicsToIndexedDB(data);
           } catch (_) {}
         }
       }
     } catch (e) {
       console.error("Error fetching topics:", e);
-      // Seamless offline recovery: load last cached topics from localStorage
+      // Seamless offline recovery: load last cached topics from localStorage, then IndexedDB
       try {
         const cached = localStorage.getItem("omnifeed_cached_topics");
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (parsed.items) {
+          if (parsed.items && parsed.items.length > 0) {
             setTopics(parsed.items);
             setTotalTopics(parsed.total || parsed.items.length);
             setTotalPages(parsed.total_pages || 1);
+          }
+        } else {
+          const idbTopics = await getTopicsFromIndexedDB();
+          if (idbTopics && idbTopics.length > 0) {
+            setTopics(idbTopics);
+            setTotalTopics(idbTopics.length);
+            setTotalPages(Math.ceil(idbTopics.length / pageSize) || 1);
           }
         }
       } catch (_) {}
@@ -498,21 +523,28 @@ export default function Dashboard() {
         setTopicDetail(detailData);
         try {
           localStorage.setItem(`omnifeed_topic_detail_${id}`, JSON.stringify(detailData));
+          await saveTopicDetailToIndexedDB(id, detailData);
         } catch (_) {}
       } else {
-        // Fall back to localStorage cache if network request fails
+        // Fall back to localStorage or IndexedDB cache if network request fails
         const cachedDetail = localStorage.getItem(`omnifeed_topic_detail_${id}`);
         if (cachedDetail) {
           setTopicDetail(JSON.parse(cachedDetail));
+        } else {
+          const idbDetail = await getTopicDetailFromIndexedDB(id);
+          if (idbDetail) setTopicDetail(idbDetail);
         }
       }
     } catch (e) {
       console.error("Error fetching topic detail:", e);
-      // Offline fallback: load cached topic detail from localStorage
+      // Offline fallback: load cached topic detail from localStorage, then IndexedDB
       try {
         const cachedDetail = localStorage.getItem(`omnifeed_topic_detail_${id}`);
         if (cachedDetail) {
           setTopicDetail(JSON.parse(cachedDetail));
+        } else {
+          const idbDetail = await getTopicDetailFromIndexedDB(id);
+          if (idbDetail) setTopicDetail(idbDetail);
         }
       } catch (_) {}
     }
@@ -726,6 +758,24 @@ export default function Dashboard() {
             {feedSources.length > 0 && (
               <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.2 rounded-full font-bold">
                 {feedSources.length}
+              </span>
+            )}
+          </button>
+
+          {/* Offline Cache Manager Button */}
+          <button
+            onClick={async () => {
+              const metrics = await getOfflineStorageMetrics();
+              setOfflineMetrics(metrics);
+              setShowOfflineModal(true);
+            }}
+            title="Manage IndexedDB and LocalStorage offline caches and backup offline intelligence archive"
+            className="px-2.5 py-1.5 text-xs font-semibold rounded border border-slate-700 bg-slate-800 hover:bg-slate-700 text-cyan-300 transition flex items-center space-x-1"
+          >
+            <span>💾 Cache</span>
+            {offlineMetrics.topicCount > 0 && (
+              <span className="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800 px-1.5 py-0.2 rounded-full font-bold">
+                {offlineMetrics.topicCount}
               </span>
             )}
           </button>
@@ -1243,6 +1293,100 @@ export default function Dashboard() {
                 Loading cluster intelligence deep dive...
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Offline Storage & Cache Manager Modal */}
+      {showOfflineModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-xl bg-slate-900 border border-cyan-800/80 rounded-xl p-6 shadow-2xl space-y-6">
+            <button
+              onClick={() => setShowOfflineModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition"
+            >
+              ✕
+            </button>
+
+            <div>
+              <h2 className="text-xl font-bold text-cyan-400 flex items-center space-x-2">
+                <span>💾 Offline Intelligence Storage</span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Omnifeed uses IndexedDB & Service Worker caches to provide seamless offline intelligence across Desktop, PWA, and Web.
+              </p>
+            </div>
+
+            {/* Storage telemetry metrics */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Cached Topics</span>
+                <p className="text-xl font-bold text-cyan-300 mt-1">{offlineMetrics.topicCount}</p>
+                <span className="text-[10px] text-slate-500">In IndexedDB store</span>
+              </div>
+              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Cached Details</span>
+                <p className="text-xl font-bold text-emerald-400 mt-1">{offlineMetrics.detailCount}</p>
+                <span className="text-[10px] text-slate-500">Deep-dive stories</span>
+              </div>
+              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Estimated Footprint</span>
+                <p className="text-xl font-bold text-amber-300 mt-1">
+                  {(offlineMetrics.estimatedBytes / 1024).toFixed(1)} KB
+                </p>
+                <span className="text-[10px] text-slate-500">Persistent disk storage</span>
+              </div>
+            </div>
+
+            {/* Offline actions */}
+            <div className="space-y-3 pt-2">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={async () => {
+                    const idbTopics = await getTopicsFromIndexedDB();
+                    const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), topics: idbTopics }, null, 2)], {
+                      type: "application/json",
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `omnifeed_offline_vault_${new Date().toISOString().slice(0, 10)}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="px-3 py-2 text-xs font-semibold bg-cyan-900/40 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-700/60 rounded transition flex items-center space-x-1.5"
+                >
+                  <span>📦 Export Offline Vault</span>
+                </button>
+
+                <button
+                  onClick={async () => {
+                    if (confirm("Purge IndexedDB and LocalStorage offline caches? Fresh data will be cached on subsequent requests.")) {
+                      await clearOfflineIndexedDB();
+                      localStorage.removeItem("omnifeed_cached_topics");
+                      const m = await getOfflineStorageMetrics();
+                      setOfflineMetrics(m);
+                    }
+                  }}
+                  className="px-3 py-2 text-xs font-semibold bg-rose-950/40 hover:bg-rose-950/60 text-rose-300 border border-rose-800/60 rounded transition flex items-center space-x-1.5"
+                >
+                  <span>🧹 Purge Offline Cache</span>
+                </button>
+
+                <button
+                  onClick={async () => {
+                    const metrics = await getOfflineStorageMetrics();
+                    setOfflineMetrics(metrics);
+                  }}
+                  className="px-3 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded transition flex items-center space-x-1.5"
+                >
+                  <span>🔄 Refresh Metrics</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Pending Background Sync Queue: <strong className="text-slate-300">{pendingSyncCount} operations</strong> queued for auto-replay.
+              </p>
+            </div>
           </div>
         </div>
       )}

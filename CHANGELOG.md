@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.7.3] - 2026-11-07
+### Added
+- Client-side IndexedDB persistent storage vault (`frontend/src/utils/offlineStore.ts`) providing robust offline storage for clustered topics, detailed articles, and storage telemetry metrics.
+- Interactive Offline Storage & Cache Manager modal accessible via the navigation header (`💾 Cache`), displaying stored topic counts, deep-dive detail counts, estimated byte footprint, and pending background sync queues.
+- Offline Vault JSON archive export capability, enabling offline backups and data portability even in fully air-gapped environments.
+- Selective offline cache purging and real-time storage metrics recalculation.
+- Enhanced Playwright automated offline verification suite in `scripts/test_offline_data_access.py` testing IndexedDB record counts and modal interactions.
+
 ## [0.7.2] - 2026-10-24
 ### Added
 - Synchronized Tauri desktop configuration bundle version to v0.7.2 in `frontend/src-tauri/tauri.conf.json`.

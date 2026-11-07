@@ -40,5 +40,6 @@
 - [x] Service Worker Background Sync (`sync-omnifeed-queue`) and PWA distribution build finalization (v0.7.0).
 - [x] Feed source health diagnostics and real-time endpoint latency probing (v0.7.1).
 - [x] Unified PWA and Tauri desktop offline bundle validation (v0.7.2).
+- [x] IndexedDB Intelligence Vault (`omnifeed_offline_db`) and Offline Storage Governance Modal (v0.7.3).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

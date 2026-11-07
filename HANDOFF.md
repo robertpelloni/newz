@@ -1,19 +1,27 @@
 # Omnifeed (Newz) - Session Handoff & Architecture Notes
 
-## Session Summary (v0.7.2)
-In this release iteration, we finalized the PWA and Tauri desktop cross-platform offline integration:
-1. **Tauri Desktop Configuration & Build Script Integration**:
-   - Synchronized bundle version in `frontend/src-tauri/tauri.conf.json` to `0.7.2`.
-   - Updated `scripts/build_offline_distribution.sh` to validate Tauri v2 configurations, icons, and bundle schemas alongside PWA checks.
-2. **Refined Cross-Platform Runtime Indicator**:
-   - Enhanced runtime badge in `frontend/src/app/page.tsx` with explicit tooltips detailing offline cache and sync queue active status across Desktop (Tauri), PWA, and Web environments.
-3. **Testing & Verification**:
-   - Executed `scripts/build_offline_distribution.sh` validating both PWA and desktop packaging.
-   - Executed automated offline data access test suite (`scripts/test_offline_data_access.py`).
+## Session Summary (v0.7.3)
+In this release iteration, we refined the offline data handling and PWA integration with client-side IndexedDB persistent storage and cache governance:
+1. **IndexedDB Client Storage Vault**:
+   - Implemented `frontend/src/utils/offlineStore.ts` using IndexedDB (`omnifeed_offline_db`, v1) with object stores for topics (`topics_store`), story details (`details_store`), and metrics (`metrics_store`).
+   - Seamlessly falls back to IndexedDB if network fetch and localStorage miss during offline operation.
+2. **Offline Storage & Cache Manager UI**:
+   - Added an interactive modal in `frontend/src/app/page.tsx` accessible via the header `💾 Cache` button.
+   - Displays real-time offline metrics (cached topics count, cached story deep-dive count, estimated storage footprint in KB).
+   - Allows users to export an offline intelligence vault JSON file for backup and portability, purge offline caches, and view pending sync queues.
+3. **Automated Testing & End-to-End Verification**:
+   - Extended `scripts/test_offline_data_access.py` to test IndexedDB store persistence, record count verification, and modal UI interaction via Playwright.
+   - Rebuilt Next.js bundle without compilation errors.
    - Verified all 16 backend unit tests pass in `backend/tests/test_api.py`.
-   - Captured screenshot `platform_offline_verification.png` validating runtime badge and offline fallback behavior.
-   - Bumped single-source version in `VERSION.md` to `0.7.2`.
+   - Synchronized single-source version `0.7.3` across `VERSION.md`, `frontend/src-tauri/tauri.conf.json`, `CHANGELOG.md`, `ROADMAP.md`, `TODO.md`, and `HANDOFF.md`.
+
+## Active Runtime Environment:
+- **Current Version**: v0.7.3 (tracked in `VERSION.md`).
+- **Git Branch**: `jules-6192871868108129425-4e3e34d4`
+- **Active Ports**:
+  - FastAPI Backend: `http://localhost:8000` (PID managed, live telemetry delta streaming on `/api/ws/feed`)
+  - Next.js Production Server: `http://localhost:3000` (PID managed)
 
 ## Next Steps for Successor Models:
-- Optional: Add custom user-created tag annotations for bookmarked clusters.
-- Optional: Add automated periodic background feed health heartbeat.
+- Optional: Add periodic automated background latency heartbeats for subscribed RSS sources.
+- Optional: Add tag-based search and annotation for offline saved bookmarks.
