@@ -47,5 +47,6 @@
 - [x] Offline IndexedDB Search, Filter & Heuristic AI Synthesis (v0.7.7).
 - [x] Offline Vault Import Restoration & Feed Health Persistence (v0.7.8).
 - [x] Concurrent Bulk Feed Health Probing & Diagnostics Telemetry (v0.7.9).
+- [x] Multi-Tier Bookmark Persistence & Vault Preservation (v0.8.0).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

@@ -9,6 +9,8 @@ import {
   clearOfflineIndexedDB,
   getOfflineStorageMetrics,
   importOfflineVault,
+  saveBookmarksToIndexedDB,
+  getBookmarksFromIndexedDB,
 } from "../utils/offlineStore";
 
 interface Topic {
@@ -227,8 +229,21 @@ export default function Dashboard() {
         const saved = localStorage.getItem("omnifeed_bookmarks");
         if (saved) {
           setBookmarkedIds(JSON.parse(saved));
+        } else {
+          getBookmarksFromIndexedDB().then((ids) => {
+            if (ids && ids.length > 0) {
+              setBookmarkedIds(ids);
+              try {
+                localStorage.setItem("omnifeed_bookmarks", JSON.stringify(ids));
+              } catch (_) {}
+            }
+          }).catch(() => {});
         }
-      } catch (_) {}
+      } catch (_) {
+        getBookmarksFromIndexedDB().then((ids) => {
+          if (ids && ids.length > 0) setBookmarkedIds(ids);
+        }).catch(() => {});
+      }
 
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker
@@ -261,6 +276,7 @@ export default function Dashboard() {
       const updated = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
       try {
         localStorage.setItem("omnifeed_bookmarks", JSON.stringify(updated));
+        saveBookmarksToIndexedDB(updated).catch(() => {});
       } catch (_) {}
       return updated;
     });
@@ -1497,9 +1513,24 @@ export default function Dashboard() {
                 <button
                   onClick={async () => {
                     const idbTopics = await getTopicsFromIndexedDB();
-                    const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), topics: idbTopics }, null, 2)], {
-                      type: "application/json",
-                    });
+                    const idbBookmarks = await getBookmarksFromIndexedDB();
+                    const bookmarksToSave = idbBookmarks.length > 0 ? idbBookmarks : bookmarkedIds;
+                    const blob = new Blob(
+                      [
+                        JSON.stringify(
+                          {
+                            exported_at: new Date().toISOString(),
+                            topics: idbTopics,
+                            bookmarks: bookmarksToSave,
+                          },
+                          null,
+                          2
+                        ),
+                      ],
+                      {
+                        type: "application/json",
+                      }
+                    );
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement("a");
                     a.href = url;
@@ -1540,9 +1571,13 @@ export default function Dashboard() {
                         const parsed = JSON.parse(text);
                         const result = await importOfflineVault(parsed);
                         fetchTopics();
+                        if (Array.isArray(parsed.bookmarks) && parsed.bookmarks.length > 0) {
+                          setBookmarkedIds(parsed.bookmarks);
+                          localStorage.setItem("omnifeed_bookmarks", JSON.stringify(parsed.bookmarks));
+                        }
                         const metrics = await getOfflineStorageMetrics();
                         setOfflineMetrics(metrics);
-                        setLiveAlert(`Vault imported: ${result.topicsImported} topics restored.`);
+                        setLiveAlert(`Vault imported: ${result.topicsImported} topics and ${result.bookmarksImported || 0} bookmarks restored.`);
                         setTimeout(() => setLiveAlert(null), 3000);
                       } catch (err) {
                         alert("Failed to import vault file. Ensure it is a valid JSON vault.");

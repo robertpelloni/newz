@@ -4,7 +4,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 def test_offline_caching_and_sync():
-    print("[1/7] Launching headless browser to test PWA, IndexedDB, offline filtering, vault export/import, and sync queue...")
+    print("[1/8] Launching headless browser to test PWA, IndexedDB, offline filtering, bookmarks, and sync queue...")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
@@ -14,7 +14,7 @@ def test_offline_caching_and_sync():
         page = context.new_page()
 
         # Step 1: Prime cache online
-        print("[2/7] Navigating while online to prime Service Worker, LocalStorage, and IndexedDB...")
+        print("[2/8] Navigating while online to prime Service Worker, LocalStorage, and IndexedDB...")
         page.goto("http://localhost:3000", wait_until="networkidle")
         time.sleep(2)
 
@@ -48,8 +48,34 @@ def test_offline_caching_and_sync():
         print(f"       IndexedDB cached topics count: {idb_count}")
         assert idb_count > 0, "Expected topics to be saved to IndexedDB topics_store"
 
-        # Step 2: Simulate offline mode
-        print("[3/7] Simulating offline mode (context.set_offline(True))...")
+        # Step 2: Toggle a bookmark and test persistence in IndexedDB
+        print("[3/8] Testing bookmark creation and multi-tier store persistence...")
+        bookmark_btn = page.locator("button[title*='Bookmark topic for offline reading']").first
+        assert bookmark_btn.is_visible(), "Expected Bookmark button on topic card"
+        bookmark_btn.click()
+        time.sleep(0.5)
+
+        saved_bm = page.evaluate("""
+            async () => {
+                return new Promise((resolve) => {
+                    const req = indexedDB.open('omnifeed_offline_db', 1);
+                    req.onsuccess = () => {
+                        const db = req.result;
+                        const tx = db.transaction('metrics_store', 'readonly');
+                        const store = tx.objectStore('metrics_store');
+                        const getReq = store.get('bookmarked_ids');
+                        getReq.onsuccess = () => resolve(getReq.result ? getReq.result.ids : []);
+                        getReq.onerror = () => resolve([]);
+                    };
+                    req.onerror = () => resolve([]);
+                });
+            }
+        """)
+        print(f"       IndexedDB bookmarked ids: {saved_bm}")
+        assert isinstance(saved_bm, list) and len(saved_bm) > 0, "Expected bookmark to persist in IndexedDB"
+
+        # Step 3: Simulate offline mode
+        print("[4/8] Simulating offline mode (context.set_offline(True))...")
         context.set_offline(True)
         page.evaluate("() => window.dispatchEvent(new Event('offline'))")
         time.sleep(1)
@@ -59,8 +85,8 @@ def test_offline_caching_and_sync():
         assert offline_banner.is_visible(), "Expected offline indicator banner to be visible"
         print("       Offline mode banner confirmed visible.")
 
-        # Step 3: Test offline search filtering over IndexedDB cached store
-        print("[4/7] Testing offline search filtering against cached vault...")
+        # Step 4: Test offline search filtering over IndexedDB cached store
+        print("[5/8] Testing offline search filtering against cached vault...")
         search_input = page.locator("input[placeholder*='Search topics']")
         first_topic_title = topics[0].split()[0] # first word
         search_input.fill(first_topic_title)
@@ -72,8 +98,8 @@ def test_offline_caching_and_sync():
         search_input.fill("")
         time.sleep(0.5)
 
-        # Step 4: Trigger offline sync actions
-        print("[5/7] Triggering Sync while offline to verify queue accumulation...")
+        # Step 5: Trigger offline sync actions
+        print("[6/8] Triggering Sync while offline to verify queue accumulation...")
         sync_button = page.locator("button:has-text('⚡ Queue Sync')")
         assert sync_button.is_visible(), "Expected Queue Sync button to appear while offline"
         sync_button.click()
@@ -83,8 +109,8 @@ def test_offline_caching_and_sync():
         assert queue_data is not None and "sync_feeds" in queue_data, "Expected offline action to be queued in localStorage"
         print(f"       Offline sync queue confirmed in localStorage: {queue_data}")
 
-        # Step 5: Open Offline Storage Management modal and verify buttons
-        print("[6/7] Verifying Offline Storage Modal, Replay Queue button, and Import Vault...")
+        # Step 6: Open Offline Storage Management modal and verify buttons
+        print("[7/8] Verifying Offline Storage Modal, Replay Queue button, and Import Vault...")
         cache_btn = page.locator("button:has-text('💾 Cache')")
         assert cache_btn.is_visible(), "Expected Cache button in header"
         cache_btn.click()
@@ -100,8 +126,8 @@ def test_offline_caching_and_sync():
         assert import_label.is_visible(), "Expected Import Vault button in modal"
         print("       Replay Queue and Import Vault buttons confirmed visible in modal.")
 
-        # Step 6: Test programmatic vault import restoration
-        print("[7/7] Testing vault import restoration into IndexedDB store...")
+        # Step 7: Test programmatic vault import restoration
+        print("[8/8] Testing vault import restoration into IndexedDB store...")
         import_res = page.evaluate("""
             async () => {
                 const dummyVault = {
@@ -116,15 +142,16 @@ def test_offline_caching_and_sync():
                             last_updated: new Date().toISOString(),
                             article_count: 5
                         }
-                    ]
+                    ],
+                    bookmarks: [99999]
                 };
                 return new Promise((resolve) => {
                     const req = indexedDB.open('omnifeed_offline_db', 1);
                     req.onsuccess = () => {
                         const db = req.result;
-                        const tx = db.transaction('topics_store', 'readwrite');
-                        const store = tx.objectStore('topics_store');
-                        store.put(dummyVault.topics[0]);
+                        const tx = db.transaction(['topics_store', 'metrics_store'], 'readwrite');
+                        tx.objectStore('topics_store').put(dummyVault.topics[0]);
+                        tx.objectStore('metrics_store').put({ key: 'bookmarked_ids', ids: dummyVault.bookmarks });
                         tx.oncomplete = () => resolve(true);
                         tx.onerror = () => resolve(false);
                     };
@@ -132,7 +159,7 @@ def test_offline_caching_and_sync():
                 });
             }
         """)
-        assert import_res is True, "Expected dummy vault topic to be imported into IndexedDB"
+        assert import_res is True, "Expected dummy vault topic and bookmarks to be imported into IndexedDB"
         print("       Vault restoration into IndexedDB successfully verified.")
 
         # Capture screenshot for visual audit
@@ -142,7 +169,7 @@ def test_offline_caching_and_sync():
         print(f"       Verification screenshot captured at {screenshot_path}")
 
         browser.close()
-        print("SUCCESS: PWA offline caching, IndexedDB vault, offline search, vault import, and multi-action sync queue tests passed!")
+        print("SUCCESS: PWA offline caching, IndexedDB vault, bookmarks, and sync queue tests passed!")
 
 if __name__ == '__main__':
     test_offline_caching_and_sync()

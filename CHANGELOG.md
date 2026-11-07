@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.8.0] - 2026-11-07
+### Added
+- Multi-tier bookmark persistence layer synchronizing saved reading list IDs across both IndexedDB (`metrics_store`) and `localStorage` (`omnifeed_bookmarks`).
+- Offline Vault bundle export and restoration now includes saved reading list bookmarks (`omnifeed_offline_vault_*.json`), enabling complete cross-machine bookmark preservation.
+- Extended automated Playwright test suite in `scripts/test_offline_data_access.py` to validate bookmark creation, persistence, and vault restoration.
+
 ## [0.7.9] - 2026-11-07
 ### Added
 - Concurrent bulk feed health diagnostics and latency probing endpoint `POST /api/sources/ping-all` in `backend/main.py`.

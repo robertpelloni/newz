@@ -97,6 +97,40 @@ export async function getTopicDetailFromIndexedDB(id: number): Promise<any | nul
   }
 }
 
+export async function saveBookmarksToIndexedDB(ids: number[]): Promise<void> {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction(METRICS_STORE, 'readwrite');
+    const store = tx.objectStore(METRICS_STORE);
+    store.put({ key: 'bookmarked_ids', ids, updated_at: new Date().toISOString() });
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('IndexedDB saveBookmarks error:', err);
+  }
+}
+
+export async function getBookmarksFromIndexedDB(): Promise<number[]> {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction(METRICS_STORE, 'readonly');
+    const store = tx.objectStore(METRICS_STORE);
+    const request = store.get('bookmarked_ids');
+    return new Promise((resolve) => {
+      request.onsuccess = () => {
+        const res = request.result;
+        resolve(res && Array.isArray(res.ids) ? res.ids : []);
+      };
+      request.onerror = () => resolve([]);
+    });
+  } catch (err) {
+    console.warn('IndexedDB getBookmarks error:', err);
+    return [];
+  }
+}
+
 export async function clearOfflineIndexedDB(): Promise<void> {
   try {
     const db = await openDatabase();
@@ -113,15 +147,17 @@ export async function clearOfflineIndexedDB(): Promise<void> {
   }
 }
 
-export async function importOfflineVault(vaultData: { topics?: any[]; details?: any[] }): Promise<{ topicsImported: number; detailsImported: number }> {
+export async function importOfflineVault(vaultData: { topics?: any[]; details?: any[]; bookmarks?: number[] }): Promise<{ topicsImported: number; detailsImported: number; bookmarksImported: number }> {
   try {
     const db = await openDatabase();
-    const tx = db.transaction([TOPICS_STORE, DETAILS_STORE], 'readwrite');
+    const tx = db.transaction([TOPICS_STORE, DETAILS_STORE, METRICS_STORE], 'readwrite');
     const topicsStore = tx.objectStore(TOPICS_STORE);
     const detailsStore = tx.objectStore(DETAILS_STORE);
+    const metricsStore = tx.objectStore(METRICS_STORE);
 
     let topicsImported = 0;
     let detailsImported = 0;
+    let bookmarksImported = 0;
 
     if (Array.isArray(vaultData.topics)) {
       for (const t of vaultData.topics) {
@@ -141,8 +177,13 @@ export async function importOfflineVault(vaultData: { topics?: any[]; details?: 
       }
     }
 
+    if (Array.isArray(vaultData.bookmarks) && vaultData.bookmarks.length > 0) {
+      metricsStore.put({ key: 'bookmarked_ids', ids: vaultData.bookmarks, updated_at: new Date().toISOString() });
+      bookmarksImported = vaultData.bookmarks.length;
+    }
+
     return new Promise((resolve, reject) => {
-      tx.oncomplete = () => resolve({ topicsImported, detailsImported });
+      tx.oncomplete = () => resolve({ topicsImported, detailsImported, bookmarksImported });
       tx.onerror = () => reject(tx.error);
     });
   } catch (err) {

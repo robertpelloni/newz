@@ -51,3 +51,4 @@
 - [x] Offline IndexedDB client search, filtering, and heuristic AI briefing synthesis (v0.7.7).
 - [x] Offline vault import restoration and persistent feed diagnostics (v0.7.8).
 - [x] Implement concurrent bulk feed health probing endpoint and frontend controls (v0.7.9).
+- [x] Multi-tier bookmark persistence in IndexedDB and offline vault export/import inclusion (v0.8.0).
