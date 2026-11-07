@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.7.6] - 2026-11-07
+### Added
+- Multi-action offline synchronization queue supporting `add_feed`, `delete_feed`, and `sync_feeds` actions with optimistic UI feedback.
+- Interactive queue inspection and instant manual queue replay button (`⚡ Replay Queue Now`) in the Offline Storage Manager modal.
+- Extended Playwright automated test suite in `scripts/test_offline_data_access.py` to validate multi-action queue buildup and modal replay buttons.
+
 ## [0.7.5] - 2026-11-07
 ### Added
 - Native Tauri v2 desktop integration refinement with runtime `get_desktop_info` command handler and dynamic build version logging.

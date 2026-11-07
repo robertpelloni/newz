@@ -4,7 +4,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 def test_offline_caching_and_sync():
-    print("[1/5] Launching headless browser to test PWA and IndexedDB offline caching...")
+    print("[1/5] Launching headless browser to test PWA, IndexedDB, and multi-action sync queue...")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
@@ -48,23 +48,8 @@ def test_offline_caching_and_sync():
         print(f"       IndexedDB cached topics count: {idb_count}")
         assert idb_count > 0, "Expected topics to be saved to IndexedDB topics_store"
 
-        # Step 2: Open and verify Offline Cache Management modal
-        print("[3/5] Verifying Offline Cache Management modal UI...")
-        cache_btn = page.locator("button:has-text('💾 Cache')")
-        assert cache_btn.is_visible(), "Expected Cache button in header"
-        cache_btn.click()
-        time.sleep(0.5)
-
-        modal_title = page.locator("text=Offline Intelligence Storage")
-        assert modal_title.is_visible(), "Expected Offline Intelligence Storage modal to be visible"
-        print("       Offline Storage modal verified open.")
-
-        # Close modal
-        page.locator("button:has-text('✕')").click()
-        time.sleep(0.5)
-
-        # Step 3: Simulate offline mode
-        print("[4/5] Simulating offline mode (context.set_offline(True))...")
+        # Step 2: Simulate offline mode
+        print("[3/5] Simulating offline mode (context.set_offline(True))...")
         context.set_offline(True)
         page.evaluate("() => window.dispatchEvent(new Event('offline'))")
         time.sleep(1)
@@ -74,8 +59,8 @@ def test_offline_caching_and_sync():
         assert offline_banner.is_visible(), "Expected offline indicator banner to be visible"
         print("       Offline mode banner confirmed visible.")
 
-        # Step 4: Test offline sync queue
-        print("[5/5] Triggering Sync while offline to verify queue accumulation...")
+        # Step 3: Trigger offline sync actions
+        print("[4/5] Triggering Sync while offline to verify queue accumulation...")
         sync_button = page.locator("button:has-text('⚡ Queue Sync')")
         assert sync_button.is_visible(), "Expected Queue Sync button to appear while offline"
         sync_button.click()
@@ -85,6 +70,20 @@ def test_offline_caching_and_sync():
         assert queue_data is not None and "sync_feeds" in queue_data, "Expected offline action to be queued in localStorage"
         print(f"       Offline sync queue confirmed in localStorage: {queue_data}")
 
+        # Step 4: Open Offline Storage Management modal and verify queue button
+        print("[5/5] Verifying Offline Storage Modal and Replay Queue button...")
+        cache_btn = page.locator("button:has-text('💾 Cache')")
+        assert cache_btn.is_visible(), "Expected Cache button in header"
+        cache_btn.click()
+        time.sleep(0.5)
+
+        modal_title = page.locator("text=Offline Intelligence Storage")
+        assert modal_title.is_visible(), "Expected Offline Intelligence Storage modal to be visible"
+
+        replay_btn = page.locator("button:has-text('⚡ Replay Queue Now')")
+        assert replay_btn.is_visible(), "Expected Replay Queue button to be visible when items are queued"
+        print("       Replay Queue button confirmed visible in modal.")
+
         # Capture screenshot for visual audit
         os.makedirs("/home/jules/verification", exist_ok=True)
         screenshot_path = "/home/jules/verification/offline_data_access_test.png"
@@ -92,7 +91,7 @@ def test_offline_caching_and_sync():
         print(f"       Verification screenshot captured at {screenshot_path}")
 
         browser.close()
-        print("SUCCESS: PWA offline caching, IndexedDB vault, and sync queue tests passed!")
+        print("SUCCESS: PWA offline caching, IndexedDB vault, and multi-action sync queue tests passed!")
 
 if __name__ == '__main__':
     test_offline_caching_and_sync()

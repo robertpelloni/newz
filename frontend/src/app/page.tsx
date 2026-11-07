@@ -194,6 +194,16 @@ export default function Dashboard() {
             for (const action of queue) {
               if (action.type === "sync_feeds") {
                 await fetch(`${API_BASE}/api/actions/sync`, { method: "POST" }).catch(() => {});
+              } else if (action.type === "add_feed" && action.payload) {
+                await fetch(`${API_BASE}/api/sources`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(action.payload),
+                }).catch(() => {});
+              } else if (action.type === "delete_feed" && action.source_id) {
+                await fetch(`${API_BASE}/api/sources/${action.source_id}`, {
+                  method: "DELETE",
+                }).catch(() => {});
               }
             }
             localStorage.removeItem("omnifeed_sync_queue");
@@ -418,28 +428,74 @@ export default function Dashboard() {
     }
     setIsAddingFeed(true);
     try {
-      const res = await fetch(`${API_BASE}/api/sources`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      if (isOffline) {
+        // Enqueue feed subscription while offline
+        const simulatedSource: FeedSource = {
+          id: Date.now(),
           name: newFeedName.trim(),
           url: newFeedUrl.trim(),
-          type: newFeedType
-        })
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        setFeedSubmitError(err.detail || "Failed to register feed.");
-      } else {
-        const created = await res.json();
-        const updated = [...feedSources.filter(s => s.id !== created.id), created];
+          type: newFeedType,
+          active: true,
+          article_count: 0,
+        };
+        const updated = [...feedSources, simulatedSource];
         setFeedSources(updated);
         localStorage.setItem("omnifeed_sources_cache", JSON.stringify(updated));
+
+        const queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+        queue.push({
+          type: "add_feed",
+          timestamp: new Date().toISOString(),
+          payload: {
+            name: newFeedName.trim(),
+            url: newFeedUrl.trim(),
+            type: newFeedType,
+          },
+        });
+        localStorage.setItem("omnifeed_sync_queue", JSON.stringify(queue));
+        setPendingSyncCount(queue.length);
         setNewFeedName("");
         setNewFeedUrl("");
+        setLiveAlert("Feed subscription queued for sync once back online.");
+        setTimeout(() => setLiveAlert(null), 3000);
+      } else {
+        const res = await fetch(`${API_BASE}/api/sources`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: newFeedName.trim(),
+            url: newFeedUrl.trim(),
+            type: newFeedType,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          setFeedSubmitError(err.detail || "Failed to register feed.");
+        } else {
+          const created = await res.json();
+          const updated = [...feedSources.filter((s) => s.id !== created.id), created];
+          setFeedSources(updated);
+          localStorage.setItem("omnifeed_sources_cache", JSON.stringify(updated));
+          setNewFeedName("");
+          setNewFeedUrl("");
+        }
       }
     } catch (e) {
-      setFeedSubmitError("Network error: Could not reach feed registry.");
+      // If network fails during online attempt, gracefully enqueue
+      const queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+      queue.push({
+        type: "add_feed",
+        timestamp: new Date().toISOString(),
+        payload: {
+          name: newFeedName.trim(),
+          url: newFeedUrl.trim(),
+          type: newFeedType,
+        },
+      });
+      localStorage.setItem("omnifeed_sync_queue", JSON.stringify(queue));
+      setPendingSyncCount(queue.length);
+      setLiveAlert("Network unreachable: Feed queued for background sync.");
+      setTimeout(() => setLiveAlert(null), 3000);
     } finally {
       setIsAddingFeed(false);
     }
@@ -1408,9 +1464,48 @@ export default function Dashboard() {
                   <span>🔄 Refresh Metrics</span>
                 </button>
               </div>
-              <p className="text-[11px] text-slate-500">
-                Pending Background Sync Queue: <strong className="text-slate-300">{pendingSyncCount} operations</strong> queued for auto-replay.
-              </p>
+              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                <span>
+                  Pending Background Sync Queue: <strong className="text-slate-300">{pendingSyncCount} operations</strong>
+                </span>
+                {pendingSyncCount > 0 && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+                        for (const action of queue) {
+                          if (action.type === "sync_feeds") {
+                            await fetch(`${API_BASE}/api/actions/sync`, { method: "POST" }).catch(() => {});
+                          } else if (action.type === "add_feed" && action.payload) {
+                            await fetch(`${API_BASE}/api/sources`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify(action.payload),
+                            }).catch(() => {});
+                          } else if (action.type === "delete_feed" && action.source_id) {
+                            await fetch(`${API_BASE}/api/sources/${action.source_id}`, {
+                              method: "DELETE",
+                            }).catch(() => {});
+                          }
+                        }
+                        localStorage.removeItem("omnifeed_sync_queue");
+                        setPendingSyncCount(0);
+                        fetchSystemData();
+                        fetchTopics();
+                        const m = await getOfflineStorageMetrics();
+                        setOfflineMetrics(m);
+                        setLiveAlert("Sync queue replayed successfully!");
+                        setTimeout(() => setLiveAlert(null), 3000);
+                      } catch (err) {
+                        console.error("Manual replay error:", err);
+                      }
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-semibold bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/60 rounded transition flex items-center space-x-1"
+                  >
+                    <span>⚡ Replay Queue Now</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

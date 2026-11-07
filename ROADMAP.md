@@ -43,5 +43,6 @@
 - [x] IndexedDB Intelligence Vault (`omnifeed_offline_db`) and Offline Storage Governance Modal (v0.7.3).
 - [x] Bi-directional WebSocket Telemetry Streaming & Continuous Offline Ingestion Sync (v0.7.4).
 - [x] Native Tauri Desktop Integration & Dynamic Platform Sync (v0.7.5).
+- [x] Multi-Action Offline Queue & Interactive Modal Replay Controls (v0.7.6).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).
