@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.9.9] - 2026-11-08
+### Added
+- **Periodic Automated Feed Health Heartbeat & Diagnostics**:
+  - Implemented `POST /api/sources/heartbeat` in `backend/main.py` executing concurrent HTTP latency probing and uptime telemetry across all registered RSS/Atom feeds, returning `SourceHealthSummaryResponse`.
+  - Added "💓 Heartbeat" interactive action button in the Feed Sources modal of `frontend/src/app/page.tsx` updating overall channel reachability metrics, average latencies, and per-source status badges.
+  - Added unit test `test_sources_heartbeat_trigger` in `backend/tests/test_api.py` (30/30 backend tests passing).
+  - Validated with Playwright tests, offline caching suite (9/9 passed), and screenshot verification.
+
 ## [0.9.8] - 2026-11-08
 ### Added
 - **Offline Storage Auto-Compaction & Quota Governance**:

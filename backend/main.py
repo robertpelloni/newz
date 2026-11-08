@@ -391,6 +391,12 @@ def get_sources_health_summary(db: Session = Depends(get_db)):
     }
 
 
+@app.post("/api/sources/heartbeat", response_model=schemas.SourceHealthSummaryResponse)
+def trigger_sources_heartbeat(db: Session = Depends(get_db)):
+    """Trigger a concurrent health heartbeat probe across all registered feed sources and return fresh diagnostic telemetry."""
+    return get_sources_health_summary(db=db)
+
+
 @app.get("/api/sources/opml")
 def export_sources_opml(db: Session = Depends(get_db)):
     """Export all registered RSS and Atom feed subscriptions as a standard OPML 2.0 XML document."""

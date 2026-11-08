@@ -2647,6 +2647,46 @@ export default function Dashboard() {
                     type="button"
                     onClick={async () => {
                       try {
+                        const res = await fetch(`${API_BASE}/api/sources/heartbeat`, { method: "POST" });
+                        if (res.ok) {
+                          const data = await res.json();
+                          setFeedHealthSummary({
+                            total: data.total_sources,
+                            healthy: data.healthy_count,
+                            degraded: data.degraded_count,
+                            unreachable: data.unreachable_count,
+                            uptimePct: data.uptime_percentage,
+                            avgLatency: data.average_latency_ms,
+                          });
+                          if (Array.isArray(data.sources)) {
+                            setFeedSources((prev) => {
+                              const updated = prev.map((s) => {
+                                const found = data.sources.find((p: any) => p.id === s.id);
+                                return found ? { ...s, status: found.status, latency_ms: found.latency_ms } : s;
+                              });
+                              try {
+                                localStorage.setItem("omnifeed_sources_cache", JSON.stringify(updated));
+                              } catch (_) {}
+                              return updated;
+                            });
+                          }
+                          setLiveAlert(`💓 Heartbeat completed: ${data.uptime_percentage}% uptime across ${data.total_sources} feeds (${data.average_latency_ms}ms avg)`);
+                          setTimeout(() => setLiveAlert(null), 3500);
+                        }
+                      } catch (e) {
+                        console.error("Heartbeat probe failed:", e);
+                      }
+                    }}
+                    title="Run an automated health heartbeat across all registered feed sources and refresh global diagnostics"
+                    className="px-2 py-1 text-[10px] font-semibold bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800 rounded transition flex items-center space-x-1"
+                  >
+                    <span>💓 Heartbeat</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
                         const res = await fetch(`${API_BASE}/api/sources/ping-all`, { method: "POST" });
                         if (res.ok) {
                           const pingResults: Array<{ id: number; status: string; latency_ms: number }> = await res.json();

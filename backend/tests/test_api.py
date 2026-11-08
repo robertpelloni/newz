@@ -462,3 +462,16 @@ def test_export_topics_with_correlated_articles():
     res_csv = client.get("/api/topics/export?format=csv&include_articles=true")
     assert res_csv.status_code == 200
     assert "article_citations" in res_csv.text
+
+def test_sources_heartbeat_trigger():
+    # Trigger heartbeat probe
+    res = client.post("/api/sources/heartbeat")
+    assert res.status_code == 200
+    data = res.json()
+    assert "total_sources" in data
+    assert "healthy_count" in data
+    assert "uptime_percentage" in data
+    assert "average_latency_ms" in data
+    assert "sources" in data
+    assert isinstance(data["sources"], list)
+    assert 0.0 <= data["uptime_percentage"] <= 100.0
