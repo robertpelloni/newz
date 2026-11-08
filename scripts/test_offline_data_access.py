@@ -179,6 +179,25 @@ def test_offline_caching_and_sync():
         assert queue_data is not None and "sync_feeds" in queue_data, "Expected offline action to be queued in localStorage"
         print(f"       Offline sync queue confirmed in localStorage: {queue_data}")
 
+        idb_queue = page.evaluate("""
+            async () => {
+                return new Promise((resolve) => {
+                    const req = indexedDB.open('omnifeed_offline_db', 3);
+                    req.onsuccess = () => {
+                        const db = req.result;
+                        const tx = db.transaction('metrics_store', 'readonly');
+                        const store = tx.objectStore('metrics_store');
+                        const getReq = store.get('sync_queue');
+                        getReq.onsuccess = () => resolve(getReq.result ? getReq.result.queue : []);
+                        getReq.onerror = () => resolve([]);
+                    };
+                    req.onerror = () => resolve([]);
+                });
+            }
+        """)
+        assert len(idb_queue) > 0, "Expected sync queue to be persisted in IndexedDB metrics_store"
+        print(f"       IndexedDB sync queue persistence verified: {len(idb_queue)} queued actions.")
+
         # Step 7: Open Offline Storage Management modal and verify buttons
         print("[8/9] Verifying Offline Storage Modal, Replay Queue button, and Import Vault...")
         cache_btn.click()

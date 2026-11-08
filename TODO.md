@@ -67,3 +67,4 @@
 - [x] Deep text search across correlated source articles and offline bookmark annotation notes (v0.9.3).
 - [x] Export of filtered deep-search results with correlated article excerpts (v0.9.4).
 - [x] Batch bookmark and unbookmark controls for filtered topic clusters (v0.9.5).
+- [x] Dual-storage offline sync queue in IndexedDB and offline vault preservation (v0.9.6).

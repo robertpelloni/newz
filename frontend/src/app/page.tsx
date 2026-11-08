@@ -16,6 +16,8 @@ import {
   importOfflineVault,
   saveBookmarksToIndexedDB,
   getBookmarksFromIndexedDB,
+  saveSyncQueueToIndexedDB,
+  getSyncQueueFromIndexedDB,
   BookmarkAnnotation,
 } from "../utils/offlineStore";
 
@@ -214,9 +216,16 @@ export default function Dashboard() {
       setIsOffline(!navigator.onLine);
 
       // Check pending offline sync actions queue
-      const checkSyncQueue = () => {
+      const checkSyncQueue = async () => {
         try {
-          const queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+          let queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+          if (queue.length === 0) {
+            const idbQueue = await getSyncQueueFromIndexedDB();
+            if (idbQueue.length > 0) {
+              queue = idbQueue;
+              localStorage.setItem("omnifeed_sync_queue", JSON.stringify(idbQueue));
+            }
+          }
           setPendingSyncCount(queue.length);
         } catch (_) {}
       };
@@ -225,7 +234,13 @@ export default function Dashboard() {
       const replayOfflineQueue = async () => {
         setIsOffline(false);
         try {
-          const queue: Array<any> = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+          let queue: Array<any> = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+          if (queue.length === 0) {
+            const idbQueue = await getSyncQueueFromIndexedDB();
+            if (idbQueue.length > 0) {
+              queue = idbQueue;
+            }
+          }
           if (queue.length > 0) {
             setLiveAlert(`Replaying ${queue.length} offline queued actions...`);
             const remaining: Array<any> = [];
@@ -254,10 +269,12 @@ export default function Dashboard() {
             }
             if (remaining.length > 0) {
               localStorage.setItem("omnifeed_sync_queue", JSON.stringify(remaining));
+              await saveSyncQueueToIndexedDB(remaining);
               setPendingSyncCount(remaining.length);
               setLiveAlert(`Partial connection: ${remaining.length} action(s) retained in queue.`);
             } else {
               localStorage.removeItem("omnifeed_sync_queue");
+              await saveSyncQueueToIndexedDB([]);
               setPendingSyncCount(0);
               setLiveAlert("All offline queued actions synchronized successfully!");
             }
@@ -699,6 +716,7 @@ export default function Dashboard() {
           },
         });
         localStorage.setItem("omnifeed_sync_queue", JSON.stringify(queue));
+        await saveSyncQueueToIndexedDB(queue);
         setPendingSyncCount(queue.length);
         setNewFeedName("");
         setNewFeedUrl("");
@@ -796,6 +814,7 @@ export default function Dashboard() {
           source_id: id,
         });
         localStorage.setItem("omnifeed_sync_queue", JSON.stringify(queue));
+        await saveSyncQueueToIndexedDB(queue);
         setPendingSyncCount(queue.length);
         setLiveAlert("Feed removal queued for sync once back online.");
         setTimeout(() => setLiveAlert(null), 3000);
@@ -960,6 +979,7 @@ export default function Dashboard() {
         const queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
         queue.push({ type: "sync_feeds", timestamp: new Date().toISOString() });
         localStorage.setItem("omnifeed_sync_queue", JSON.stringify(queue));
+        await saveSyncQueueToIndexedDB(queue);
         setPendingSyncCount(queue.length);
 
         // Register Background Sync if supported
@@ -2128,9 +2148,11 @@ export default function Dashboard() {
                     const idbBookmarks = await getBookmarksFromIndexedDB();
                     const idbSources = await getSourcesFromIndexedDB();
                     const idbNotes = await getBookmarkAnnotationsFromIndexedDB();
+                    const idbQueue = await getSyncQueueFromIndexedDB();
                     const bookmarksToSave = idbBookmarks.length > 0 ? idbBookmarks : bookmarkedIds;
                     const sourcesToSave = idbSources.length > 0 ? idbSources : feedSources;
                     const notesList = Object.values(idbNotes).length > 0 ? Object.values(idbNotes) : Object.values(bookmarkAnnotations);
+                    const queueToSave = idbQueue.length > 0 ? idbQueue : JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
                     const blob = new Blob(
                       [
                         JSON.stringify(
@@ -2140,6 +2162,7 @@ export default function Dashboard() {
                             bookmarks: bookmarksToSave,
                             sources: sourcesToSave,
                             annotations: notesList,
+                            syncQueue: queueToSave,
                           },
                           null,
                           2
@@ -2233,9 +2256,14 @@ export default function Dashboard() {
                             return merged;
                           });
                         }
+                        if (Array.isArray(parsed.syncQueue) && parsed.syncQueue.length > 0) {
+                          localStorage.setItem("omnifeed_sync_queue", JSON.stringify(parsed.syncQueue));
+                          await saveSyncQueueToIndexedDB(parsed.syncQueue);
+                          setPendingSyncCount(parsed.syncQueue.length);
+                        }
                         const metrics = await getOfflineStorageMetrics();
                         setOfflineMetrics(metrics);
-                        setLiveAlert(`Vault imported: ${result.topicsImported} topics, ${result.sourcesImported || 0} feeds, ${result.annotationsImported || 0} notes, and ${result.bookmarksImported || 0} bookmarks restored.`);
+                        setLiveAlert(`Vault imported: ${result.topicsImported} topics, ${result.sourcesImported || 0} feeds, ${result.annotationsImported || 0} notes, ${result.bookmarksImported || 0} bookmarks, and ${result.syncQueueImported || 0} queued actions restored.`);
                         setTimeout(() => setLiveAlert(null), 3000);
                       } catch (err) {
                         alert("Failed to import vault file. Ensure it is a valid JSON vault.");
@@ -2280,6 +2308,7 @@ export default function Dashboard() {
                           }
                         }
                         localStorage.removeItem("omnifeed_sync_queue");
+                        await saveSyncQueueToIndexedDB([]);
                         setPendingSyncCount(0);
                         fetchSystemData();
                         fetchTopics();

@@ -1,22 +1,20 @@
 # Omnifeed (Newz) - Session Handoff & Architecture Notes
 
-## Session Summary (v0.9.5)
-In this release iteration, we implemented batch bookmark and unbookmark controls for filtered topic clusters:
-1. **Batch Bookmark & Unbookmark Operations**:
-   - Implemented `handleBatchBookmarkVisible` and `handleBatchUnbookmarkVisible` in `frontend/src/app/page.tsx`.
-   - Synchronizes batch updates across both IndexedDB (`saveBookmarksToIndexedDB`) and `localStorage` (`omnifeed_bookmarks`), with instant live alert toast feedback.
-   - Cleanly cleans up bookmark annotations in IndexedDB when clearing page bookmarks.
-2. **Dashboard UI Integration**:
-   - Added "★ Bookmark Visible" and "☆ Clear" batch control pills beside the topic count header in the main dashboard view.
-   - Validated batch bookmarking workflows and counter badges via automated Playwright testing.
-3. **Automated Testing & End-to-End Verification**:
+## Session Summary (v0.9.6)
+In this release iteration, we implemented dual-storage persistence for the offline sync queue across IndexedDB and LocalStorage, with vault backup preservation:
+1. **Dual-Storage Sync Queue in IndexedDB**:
+   - Implemented `saveSyncQueueToIndexedDB` and `getSyncQueueFromIndexedDB` in `frontend/src/utils/offlineStore.ts` storing uncommitted sync operations in IndexedDB `metrics_store`.
+   - Synchronized all queue mutations (enqueuing `sync_feeds`, `add_feed`, `delete_feed`, checking queue, replay, and purge) to both IndexedDB and `localStorage` in `frontend/src/app/page.tsx`.
+   - Included `syncQueue` in offline vault JSON export bundles and restored queued actions during vault imports (`importOfflineVault`).
+2. **Automated Testing & End-to-End Verification**:
+   - Extended Playwright automated test suite in `scripts/test_offline_data_access.py` validating IndexedDB sync queue persistence alongside `localStorage` (9/9 steps passing).
    - All 29 backend pytest tests pass in `backend/tests/test_api.py`.
-   - Verified Next.js production build and Playwright offline access test suite (`scripts/test_offline_data_access.py` passing all 9/9 steps).
-   - Captured visual UI screenshot (`/home/jules/verification/verify_batch_bookmark_ui.png`).
-   - Synchronized single-source version `0.9.5` across `VERSION.md`, `frontend/src-tauri/tauri.conf.json`, `frontend/src-tauri/Cargo.toml`, `CHANGELOG.md`, `ROADMAP.md`, `TODO.md`, and `HANDOFF.md`.
+   - Verified Next.js production build (`npm run build`).
+   - Captured visual UI screenshot (`/home/jules/verification/verify_storage_vault_ui.png`).
+   - Synchronized single-source version `0.9.6` across `VERSION.md`, `frontend/src-tauri/tauri.conf.json`, `frontend/src-tauri/Cargo.toml`, `CHANGELOG.md`, `ROADMAP.md`, `TODO.md`, and `HANDOFF.md`.
 
 ## Active Runtime Environment:
-- **Current Version**: v0.9.5 (tracked in `VERSION.md`).
+- **Current Version**: v0.9.6 (tracked in `VERSION.md`).
 - **Git Branch**: `jules-6192871868108129425-4e3e34d4`
 - **Active Ports**:
   - FastAPI Backend: `http://localhost:8000` (PID managed, live telemetry delta streaming on `/api/ws/feed`)

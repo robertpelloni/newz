@@ -81,6 +81,40 @@ export async function getTopicsFromIndexedDB(): Promise<any[]> {
   }
 }
 
+export async function saveSyncQueueToIndexedDB(queue: any[]): Promise<void> {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction(METRICS_STORE, 'readwrite');
+    const store = tx.objectStore(METRICS_STORE);
+    store.put({ key: 'sync_queue', queue: queue || [], updated_at: new Date().toISOString() });
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('IndexedDB saveSyncQueue error:', err);
+  }
+}
+
+export async function getSyncQueueFromIndexedDB(): Promise<any[]> {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction(METRICS_STORE, 'readonly');
+    const store = tx.objectStore(METRICS_STORE);
+    const request = store.get('sync_queue');
+    return new Promise((resolve) => {
+      request.onsuccess = () => {
+        const res = request.result;
+        resolve(res && Array.isArray(res.queue) ? res.queue : []);
+      };
+      request.onerror = () => resolve([]);
+    });
+  } catch (err) {
+    console.warn('IndexedDB getSyncQueue error:', err);
+    return [];
+  }
+}
+
 export async function saveTopicDetailToIndexedDB(id: number, detail: any): Promise<void> {
   try {
     const db = await openDatabase();
@@ -254,7 +288,7 @@ export async function clearOfflineIndexedDB(): Promise<void> {
   }
 }
 
-export async function importOfflineVault(vaultData: { topics?: any[]; details?: any[]; bookmarks?: number[]; sources?: any[]; annotations?: BookmarkAnnotation[] }): Promise<{ topicsImported: number; detailsImported: number; bookmarksImported: number; sourcesImported: number; annotationsImported: number }> {
+export async function importOfflineVault(vaultData: { topics?: any[]; details?: any[]; bookmarks?: number[]; sources?: any[]; annotations?: BookmarkAnnotation[]; syncQueue?: any[] }): Promise<{ topicsImported: number; detailsImported: number; bookmarksImported: number; sourcesImported: number; annotationsImported: number; syncQueueImported: number }> {
   try {
     const db = await openDatabase();
     const tx = db.transaction([TOPICS_STORE, DETAILS_STORE, METRICS_STORE, SOURCES_STORE, BOOKMARK_NOTES_STORE], 'readwrite');
@@ -269,6 +303,7 @@ export async function importOfflineVault(vaultData: { topics?: any[]; details?: 
     let bookmarksImported = 0;
     let sourcesImported = 0;
     let annotationsImported = 0;
+    let syncQueueImported = 0;
 
     if (Array.isArray(vaultData.topics)) {
       for (const t of vaultData.topics) {
@@ -311,8 +346,13 @@ export async function importOfflineVault(vaultData: { topics?: any[]; details?: 
       }
     }
 
+    if (Array.isArray(vaultData.syncQueue) && vaultData.syncQueue.length > 0) {
+      metricsStore.put({ key: 'sync_queue', queue: vaultData.syncQueue, updated_at: new Date().toISOString() });
+      syncQueueImported = vaultData.syncQueue.length;
+    }
+
     return new Promise((resolve, reject) => {
-      tx.oncomplete = () => resolve({ topicsImported, detailsImported, bookmarksImported, sourcesImported, annotationsImported });
+      tx.oncomplete = () => resolve({ topicsImported, detailsImported, bookmarksImported, sourcesImported, annotationsImported, syncQueueImported });
       tx.onerror = () => reject(tx.error);
     });
   } catch (err) {

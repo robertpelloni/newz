@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.9.6] - 2026-11-08
+### Added
+- **Dual-Storage Offline Sync Queue in IndexedDB & Vault Backup Preservation**:
+  - Implemented `saveSyncQueueToIndexedDB` and `getSyncQueueFromIndexedDB` in `frontend/src/utils/offlineStore.ts` storing uncommitted sync operations in IndexedDB `metrics_store`.
+  - Added dual-write and fallback synchronization across IndexedDB and `localStorage` in `frontend/src/app/page.tsx` during offline queue enqueue, replay, and purge.
+  - Included pending sync queue operations (`syncQueue`) in offline vault JSON export archives and restoration workflows (`importOfflineVault`).
+  - Extended Playwright automated test suite in `scripts/test_offline_data_access.py` validating IndexedDB sync queue persistence.
+
 ## [0.9.5] - 2026-11-08
 ### Added
 - **Batch Bookmark & Unbookmark Controls for Filtered Clusters**:
