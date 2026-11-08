@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.8.5] - 2026-11-08
+### Added
+- Topic narrative entity relationship matrix endpoint `GET /api/topics/{topic_id}/entities` in `backend/main.py`, providing entity co-occurrence counts and citing article linkages.
+- Interactive entity network explorer in the topic cluster deep-dive modal in `frontend/src/app/page.tsx`, enabling click-to-filter highlighting of source articles mentioning selected entities.
+- Automated unit test `test_topic_detail_entity_matrix_endpoint` in `backend/tests/test_api.py` (22/22 tests passing).
+
 ## [0.8.4] - 2026-11-08
 ### Added
 - Bulk offline topic deep-dive pre-caching mechanism (`⬇️ Pre-Cache All Deep-Dives`) in `frontend/src/app/page.tsx`, allowing full narrative storylines, articles, and timelines to be indexed into `details_store` for zero-connectivity browsing.

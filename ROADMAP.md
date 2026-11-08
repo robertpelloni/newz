@@ -52,5 +52,6 @@
 - [x] Autopilot Background Ingestion Pipeline & Telemetry Controls (v0.8.2).
 - [x] Interactive Narrative Timeline Ordering & Polarity Filters (v0.8.3).
 - [x] Bulk Topic Deep-Dive Pre-Caching & Offline Card Badging (v0.8.4).
+- [x] Topic Narrative Entity Matrix & Cross-Article Citations (v0.8.5).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

@@ -464,6 +464,41 @@ def summarize_topic(topic_id: int, db: Session = Depends(get_db)):
         "summary": topic.summary
     }
 
+@app.get("/api/topics/{topic_id}/entities")
+def get_topic_entity_matrix(topic_id: int, db: Session = Depends(get_db)):
+    """Extract entity co-occurrence frequency and article citation linkages."""
+    topic = db.query(models.Topic).filter(models.Topic.id == topic_id).first()
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    articles = db.query(models.Article).join(models.ArticleTopic).filter(models.ArticleTopic.topic_id == topic_id).all()
+    entities = list(topic.entities_json or [])
+
+    matrix = []
+    for ent in entities:
+        ent_lower = ent.lower()
+        citing_articles = []
+        for a in articles:
+            text = f"{a.title} {a.raw_content or ''}".lower()
+            if ent_lower in text:
+                citing_articles.append({
+                    "id": a.id,
+                    "title": a.title,
+                    "source": a.source.name if a.source else "News Feed"
+                })
+        matrix.append({
+            "entity": ent,
+            "mention_count": len(citing_articles),
+            "citations": citing_articles
+        })
+
+    matrix.sort(key=lambda x: x["mention_count"], reverse=True)
+    return {
+        "topic_id": topic_id,
+        "total_entities": len(entities),
+        "entities": matrix
+    }
+
 @app.get("/api/topics/{topic_id}")
 def get_topic(
     topic_id: int,

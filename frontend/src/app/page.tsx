@@ -122,9 +122,10 @@ export default function Dashboard() {
   const [audioAlertsEnabled, setAudioAlertsEnabled] = useState<boolean>(false);
   const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(false);
 
-  // Topic Deep-Dive Timeline Options
+  // Topic Deep-Dive Timeline & Entity Options
   const [timelineOrder, setTimelineOrder] = useState<"asc" | "desc">("asc");
   const [timelinePolarityFilter, setTimelinePolarityFilter] = useState<"all" | "positive" | "negative">("all");
+  const [selectedEntityFilter, setSelectedEntityFilter] = useState<string | null>(null);
 
   // Custom Feed Management State
   const [showFeedsModal, setShowFeedsModal] = useState<boolean>(false);
@@ -1414,18 +1415,40 @@ export default function Dashboard() {
                 {/* Extracted Named Entities */}
                 {topicDetail.topic.entities && topicDetail.topic.entities.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">
-                      Key Extracted Entities
-                    </h4>
-                    <div className="flex flex-wrap gap-1.5">
-                      {topicDetail.topic.entities.map((ent, idx) => (
-                        <span
-                          key={idx}
-                          className="bg-slate-800 text-cyan-300 border border-slate-700 px-2 py-0.5 rounded text-xs font-medium"
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">
+                        Key Extracted Entities ({topicDetail.topic.entities.length})
+                      </h4>
+                      {selectedEntityFilter && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedEntityFilter(null)}
+                          className="text-[10px] text-cyan-400 hover:text-cyan-300 transition"
                         >
-                          👤 {ent}
-                        </span>
-                      ))}
+                          Clear Entity Filter ✕
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {topicDetail.topic.entities.map((ent, idx) => {
+                        const isSelected = selectedEntityFilter === ent;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setSelectedEntityFilter(isSelected ? null : ent)}
+                            title={`Filter articles citing ${ent}`}
+                            className={`px-2 py-0.5 rounded text-xs font-medium border transition flex items-center space-x-1 ${
+                              isSelected
+                                ? "bg-cyan-600 text-white border-cyan-400 shadow-sm"
+                                : "bg-slate-800 text-cyan-300 border-slate-700 hover:border-cyan-500"
+                            }`}
+                          >
+                            <span>👤</span>
+                            <span>{ent}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1497,10 +1520,20 @@ export default function Dashboard() {
                 {/* Sources List */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">
-                    Correlated Source Articles ({topicDetail.articles.length})
+                    Correlated Source Articles ({
+                      selectedEntityFilter
+                        ? topicDetail.articles.filter((a) => a.title.toLowerCase().includes(selectedEntityFilter.toLowerCase())).length
+                        : topicDetail.articles.length
+                    })
+                    {selectedEntityFilter && <span className="text-cyan-400 font-normal lowercase ml-1.5">(mentioning {selectedEntityFilter})</span>}
                   </h4>
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {topicDetail.articles.map((art) => (
+                    {topicDetail.articles
+                      .filter((art) => {
+                        if (!selectedEntityFilter) return true;
+                        return art.title.toLowerCase().includes(selectedEntityFilter.toLowerCase());
+                      })
+                      .map((art) => (
                       <div key={art.id} className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs flex justify-between items-center">
                         <span className="font-medium text-slate-200 truncate mr-2">{art.title}</span>
                         {art.url ? (

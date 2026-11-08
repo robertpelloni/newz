@@ -56,3 +56,4 @@
 - [x] Implement autopilot background ingestion pipeline and frontend toggle controls (v0.8.2).
 - [x] Interactive narrative timeline chronological ordering and sentiment polarity filtering (v0.8.3).
 - [x] Implement bulk offline deep-dive pre-caching and topic card cached badging (v0.8.4).
+- [x] Topic narrative entity relationship matrix and interactive citation filtering (v0.8.5).

@@ -283,3 +283,21 @@ def test_topic_detail_timeline_ordering_and_filtering():
         tl_asc = res_asc.json()["topic"]["timeline"]
         if len(tl_asc) >= 2:
             assert tl_asc[0]["timestamp"] <= tl_asc[1]["timestamp"]
+
+def test_topic_detail_entity_matrix_endpoint():
+    topics_res = client.get("/api/topics?page_size=1")
+    assert topics_res.status_code == 200
+    items = topics_res.json()["items"]
+    if len(items) > 0:
+        topic_id = items[0]["id"]
+        res = client.get(f"/api/topics/{topic_id}/entities")
+        assert res.status_code == 200
+        data = res.json()
+        assert "topic_id" in data
+        assert "total_entities" in data
+        assert "entities" in data
+        assert isinstance(data["entities"], list)
+        for ent in data["entities"]:
+            assert "entity" in ent
+            assert "mention_count" in ent
+            assert "citations" in ent
