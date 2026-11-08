@@ -262,3 +262,24 @@ def test_autopilot_settings_lifecycle():
     reset_res = client.post("/api/settings/autopilot", json={"enabled": False})
     assert reset_res.status_code == 200
     assert reset_res.json()["autopilot"]["enabled"] is False
+
+def test_topic_detail_timeline_ordering_and_filtering():
+    # Fetch first available topic
+    topics_res = client.get("/api/topics?page_size=1")
+    assert topics_res.status_code == 200
+    items = topics_res.json()["items"]
+    if len(items) > 0:
+        topic_id = items[0]["id"]
+        # Query with desc ordering
+        res_desc = client.get(f"/api/topics/{topic_id}?timeline_order=desc")
+        assert res_desc.status_code == 200
+        tl_desc = res_desc.json()["topic"]["timeline"]
+        if len(tl_desc) >= 2:
+            assert tl_desc[0]["timestamp"] >= tl_desc[1]["timestamp"]
+
+        # Query with asc ordering
+        res_asc = client.get(f"/api/topics/{topic_id}?timeline_order=asc")
+        assert res_asc.status_code == 200
+        tl_asc = res_asc.json()["topic"]["timeline"]
+        if len(tl_asc) >= 2:
+            assert tl_asc[0]["timestamp"] <= tl_asc[1]["timestamp"]

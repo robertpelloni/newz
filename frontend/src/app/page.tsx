@@ -122,6 +122,10 @@ export default function Dashboard() {
   const [audioAlertsEnabled, setAudioAlertsEnabled] = useState<boolean>(false);
   const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(false);
 
+  // Topic Deep-Dive Timeline Options
+  const [timelineOrder, setTimelineOrder] = useState<"asc" | "desc">("asc");
+  const [timelinePolarityFilter, setTimelinePolarityFilter] = useState<"all" | "positive" | "negative">("all");
+
   // Custom Feed Management State
   const [showFeedsModal, setShowFeedsModal] = useState<boolean>(false);
   const [feedSources, setFeedSources] = useState<FeedSource[]>([]);
@@ -1421,32 +1425,63 @@ export default function Dashboard() {
                 {/* Narrative Evolution Timeline */}
                 {topicDetail.topic.timeline && topicDetail.topic.timeline.length > 0 && (
                   <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">
-                      Narrative Evolution Timeline
-                    </h4>
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">
+                        Narrative Evolution Timeline
+                      </h4>
+                      <div className="flex items-center space-x-1.5 text-[10px]">
+                        <button
+                          type="button"
+                          onClick={() => setTimelineOrder(timelineOrder === "asc" ? "desc" : "asc")}
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition"
+                        >
+                          {timelineOrder === "asc" ? "Oldest First ↑" : "Newest First ↓"}
+                        </button>
+                        <select
+                          value={timelinePolarityFilter}
+                          onChange={(e) => setTimelinePolarityFilter(e.target.value as "all" | "positive" | "negative")}
+                          className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded border border-slate-700 focus:outline-none"
+                        >
+                          <option value="all">All Sentiment</option>
+                          <option value="positive">+ Positive</option>
+                          <option value="negative">- Negative</option>
+                        </select>
+                      </div>
+                    </div>
                     <div className="relative border-l border-cyan-800/60 ml-2 pl-4 space-y-3">
-                      {topicDetail.topic.timeline.map((event, idx) => (
-                        <div key={idx} className="relative group">
-                          <div className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full bg-cyan-400 group-hover:scale-125 transition" />
-                          <div className="text-xs flex items-center space-x-2">
-                            <span className="text-cyan-400 font-semibold">{event.source}</span>
-                            {event.source_type && (
-                              <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded">
-                                {event.source_type}
+                      {[...topicDetail.topic.timeline]
+                        .filter((event) => {
+                          if (timelinePolarityFilter === "positive") return (event.polarity || 0) > 0.05;
+                          if (timelinePolarityFilter === "negative") return (event.polarity || 0) < -0.05;
+                          return true;
+                        })
+                        .sort((a, b) => {
+                          const timeA = new Date(a.timestamp || 0).getTime();
+                          const timeB = new Date(b.timestamp || 0).getTime();
+                          return timelineOrder === "asc" ? timeA - timeB : timeB - timeA;
+                        })
+                        .map((event, idx) => (
+                          <div key={idx} className="relative group">
+                            <div className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full bg-cyan-400 group-hover:scale-125 transition" />
+                            <div className="text-xs flex items-center space-x-2">
+                              <span className="text-cyan-400 font-semibold">{event.source}</span>
+                              {event.source_type && (
+                                <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded">
+                                  {event.source_type}
+                                </span>
+                              )}
+                              {event.polarity !== undefined && (
+                                <span className={`text-[10px] font-bold ${event.polarity > 0 ? "text-emerald-400" : event.polarity < 0 ? "text-rose-400" : "text-slate-400"}`}>
+                                  {event.polarity > 0 ? "+" : ""}{Math.round(event.polarity * 100)}%
+                                </span>
+                              )}
+                              <span className="text-slate-500">
+                                {event.timestamp ? new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recent"}
                               </span>
-                            )}
-                            {event.polarity !== undefined && (
-                              <span className={`text-[10px] font-bold ${event.polarity > 0 ? "text-emerald-400" : event.polarity < 0 ? "text-rose-400" : "text-slate-400"}`}>
-                                {event.polarity > 0 ? "+" : ""}{Math.round(event.polarity * 100)}%
-                              </span>
-                            )}
-                            <span className="text-slate-500">
-                              {event.timestamp ? new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recent"}
-                            </span>
+                            </div>
+                            <p className="text-xs text-slate-200 mt-0.5">{event.headline}</p>
                           </div>
-                          <p className="text-xs text-slate-200 mt-0.5">{event.headline}</p>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 )}

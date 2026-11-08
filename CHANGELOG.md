@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.8.3] - 2026-11-07
+### Added
+- Chronological ordering and polarity filtering query parameters (`timeline_order`, `min_polarity`) for `GET /api/topics/{topic_id}` in `backend/main.py`.
+- Interactive timeline direction controls (Oldest First / Newest First) and polarity selector (+ Positive, - Negative, All Sentiment) in the topic cluster deep-dive modal in `frontend/src/app/page.tsx`.
+- Automated unit test `test_topic_detail_timeline_ordering_and_filtering` in `backend/tests/test_api.py` (21/21 tests passing).
+
 ## [0.8.2] - 2026-11-07
 ### Added
 - Autopilot background ingestion settings API (`GET` & `POST /api/settings/autopilot`) enabling automated dynamic scheduling and state inspection.

@@ -50,5 +50,6 @@
 - [x] Multi-Tier Bookmark Persistence & Vault Preservation (v0.8.0).
 - [x] Multi-Criteria Topic Sorting & Disconnected Sorting Engine (v0.8.1).
 - [x] Autopilot Background Ingestion Pipeline & Telemetry Controls (v0.8.2).
+- [x] Interactive Narrative Timeline Ordering & Polarity Filters (v0.8.3).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

@@ -465,7 +465,12 @@ def summarize_topic(topic_id: int, db: Session = Depends(get_db)):
     }
 
 @app.get("/api/topics/{topic_id}")
-def get_topic(topic_id: int, db: Session = Depends(get_db)):
+def get_topic(
+    topic_id: int,
+    timeline_order: str = Query("asc", pattern="^(asc|desc)$"),
+    min_polarity: float = Query(0.0, ge=0.0, le=1.0),
+    db: Session = Depends(get_db)
+):
     topic = db.query(models.Topic).filter(models.Topic.id == topic_id).first()
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
@@ -473,6 +478,13 @@ def get_topic(topic_id: int, db: Session = Depends(get_db)):
     articles = db.query(models.Article).join(models.ArticleTopic).filter(models.ArticleTopic.topic_id == topic_id).all()
     discussions = db.query(models.Discussion).filter(models.Discussion.topic_id == topic_id).all()
     sentiments = db.query(models.Sentiment).filter(models.Sentiment.topic_id == topic_id).all()
+
+    # Process and filter timeline milestones according to order and polarity threshold
+    timeline = list(topic.timeline_json or [])
+    if min_polarity > 0.0:
+        timeline = [e for e in timeline if abs(e.get("polarity", 0.0)) >= min_polarity]
+
+    timeline.sort(key=lambda x: x.get("timestamp", ""), reverse=(timeline_order == "desc"))
 
     return {
         "topic": {
@@ -483,7 +495,7 @@ def get_topic(topic_id: int, db: Session = Depends(get_db)):
             "first_seen": topic.first_seen.isoformat() if topic.first_seen else None,
             "last_updated": topic.last_updated.isoformat() if topic.last_updated else None,
             "entities": topic.entities_json or [],
-            "timeline": topic.timeline_json or [],
+            "timeline": timeline,
         },
         "articles": [
             {
