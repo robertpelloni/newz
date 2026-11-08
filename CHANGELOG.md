@@ -2,6 +2,15 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.9.8] - 2026-11-08
+### Added
+- **Offline Storage Auto-Compaction & Quota Governance**:
+  - Implemented `compactOfflineVault(preserveLimit)` in `frontend/src/utils/offlineStore.ts` pruning oldest unbookmarked story details from IndexedDB `details_store` while strictly preserving bookmarked topics, user notes/tags, feed sources, and pending offline sync actions.
+  - Implemented `getStorageQuotaEstimate()` in `frontend/src/utils/offlineStore.ts` querying `navigator.storage.estimate()` for total disk quota allocation and active utilization percentages.
+  - Integrated Storage Quota Governance progress bar and telemetry badges in the Offline Storage & Cache Manager modal of `frontend/src/app/page.tsx`.
+  - Added "🗜️ Compact Vault" trigger button with live feedback notifications informing users of pruned detail counts.
+  - Validated compaction behavior, quota calculations, and visual rendering via Playwright end-to-end tests and visual screenshot inspection.
+
 ## [0.9.7] - 2026-11-08
 ### Added
 - **Keyboard Shortcut Navigation & Accessibility Controls**:

@@ -69,3 +69,4 @@
 - [x] Batch bookmark and unbookmark controls for filtered topic clusters (v0.9.5).
 - [x] Dual-storage offline sync queue in IndexedDB and offline vault preservation (v0.9.6).
 - [x] Keyboard shortcut navigation and accessibility controls with visual focus ring and help dialog (v0.9.7).
+- [x] Offline storage auto-compaction and quota governance with visual telemetry progress bar (v0.9.8).

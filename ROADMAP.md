@@ -65,5 +65,6 @@
 - [x] Batch Bookmark & Unbookmark Controls for Filtered Clusters (v0.9.5).
 - [x] Dual-Storage Offline Sync Queue in IndexedDB & Vault Backup Preservation (v0.9.6).
 - [x] Keyboard Shortcut Navigation & Accessibility Controls (v0.9.7).
+- [x] Offline Storage Auto-Compaction & Quota Governance (v0.9.8).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

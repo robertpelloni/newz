@@ -361,6 +361,75 @@ export async function importOfflineVault(vaultData: { topics?: any[]; details?: 
   }
 }
 
+export async function getStorageQuotaEstimate(): Promise<{ usageBytes: number; quotaBytes: number; percentUsed: number }> {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate) {
+      const estimate = await navigator.storage.estimate();
+      const usage = estimate.usage || 0;
+      const quota = estimate.quota || 0;
+      const percent = quota > 0 ? (usage / quota) * 100 : 0;
+      return {
+        usageBytes: usage,
+        quotaBytes: quota,
+        percentUsed: Number(percent.toFixed(2))
+      };
+    }
+  } catch (err) {
+    console.warn('Quota estimate failed:', err);
+  }
+  return { usageBytes: 0, quotaBytes: 0, percentUsed: 0 };
+}
+
+export async function compactOfflineVault(preserveLimit = 50): Promise<{ detailsPruned: number; remainingDetails: number }> {
+  try {
+    const db = await openDatabase();
+    const bookmarkedIds = await getBookmarksFromIndexedDB();
+    const bookmarkSet = new Set(bookmarkedIds.map((id) => Number(id)));
+
+    const tx = db.transaction(DETAILS_STORE, 'readwrite');
+    const store = tx.objectStore(DETAILS_STORE);
+    const allDetailsRequest = store.getAll();
+
+    return new Promise((resolve, reject) => {
+      allDetailsRequest.onsuccess = () => {
+        const allDetails: any[] = allDetailsRequest.result || [];
+        // Separate bookmarked details from unbookmarked details
+        const unbookmarkedDetails = allDetails.filter((d) => !bookmarkSet.has(Number(d.id)));
+
+        // Sort unbookmarked by oldest cached_at first
+        unbookmarkedDetails.sort((a, b) => {
+          const dateA = a.cached_at ? new Date(a.cached_at).getTime() : 0;
+          const dateB = b.cached_at ? new Date(b.cached_at).getTime() : 0;
+          return dateA - dateB;
+        });
+
+        const targetPruneCount = Math.max(0, unbookmarkedDetails.length - preserveLimit);
+        let pruned = 0;
+
+        for (let i = 0; i < targetPruneCount; i++) {
+          const item = unbookmarkedDetails[i];
+          if (item && item.id) {
+            store.delete(item.id);
+            pruned += 1;
+          }
+        }
+
+        tx.oncomplete = () => {
+          resolve({
+            detailsPruned: pruned,
+            remainingDetails: allDetails.length - pruned
+          });
+        };
+        tx.onerror = () => reject(tx.error);
+      };
+      allDetailsRequest.onerror = () => reject(allDetailsRequest.error);
+    });
+  } catch (err) {
+    console.error('Failed to compact offline vault:', err);
+    return { detailsPruned: 0, remainingDetails: 0 };
+  }
+}
+
 export async function getOfflineStorageMetrics(): Promise<{ topicCount: number; detailCount: number; sourceCount: number; annotationCount: number; estimatedBytes: number }> {
   try {
     const db = await openDatabase();

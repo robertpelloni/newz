@@ -18,6 +18,8 @@ import {
   getBookmarksFromIndexedDB,
   saveSyncQueueToIndexedDB,
   getSyncQueueFromIndexedDB,
+  compactOfflineVault,
+  getStorageQuotaEstimate,
   BookmarkAnnotation,
 } from "../utils/offlineStore";
 
@@ -143,6 +145,13 @@ export default function Dashboard() {
   const [focusedTopicIndex, setFocusedTopicIndex] = useState<number>(-1);
   const [showShortcutsModal, setShowShortcutsModal] = useState<boolean>(false);
   const [selectedEntityFilter, setSelectedEntityFilter] = useState<string | null>(null);
+
+  // Storage Quota Telemetry
+  const [storageQuota, setStorageQuota] = useState<{ usageBytes: number; quotaBytes: number; percentUsed: number }>({
+    usageBytes: 0,
+    quotaBytes: 0,
+    percentUsed: 0,
+  });
 
   // Custom Feed Management State
   const [showFeedsModal, setShowFeedsModal] = useState<boolean>(false);
@@ -1366,8 +1375,12 @@ export default function Dashboard() {
           {/* Offline Cache Manager Button */}
           <button
             onClick={async () => {
-              const metrics = await getOfflineStorageMetrics();
+              const [metrics, quota] = await Promise.all([
+                getOfflineStorageMetrics(),
+                getStorageQuotaEstimate(),
+              ]);
               setOfflineMetrics(metrics);
+              setStorageQuota(quota);
               setShowOfflineModal(true);
             }}
             title="Manage IndexedDB and LocalStorage offline caches and backup offline intelligence archive"
@@ -2235,6 +2248,29 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Browser Storage Quota Telemetry */}
+            {storageQuota.quotaBytes > 0 && (
+              <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 flex items-center justify-between">
+                <div>
+                  <div className="text-[11px] font-semibold text-slate-300 flex items-center space-x-1.5">
+                    <span>📊 Storage Quota Governance</span>
+                    <span className="text-[9px] bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded font-mono">
+                      {storageQuota.percentUsed.toFixed(1)}% used
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    {(storageQuota.usageBytes / (1024 * 1024)).toFixed(1)} MB used of {(storageQuota.quotaBytes / (1024 * 1024)).toFixed(0)} MB allocated quota
+                  </div>
+                </div>
+                <div className="w-24 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-cyan-500 h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.max(2, storageQuota.percentUsed))}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Offline actions */}
             <div className="space-y-3 pt-2">
               <div className="flex flex-wrap gap-2">
@@ -2282,11 +2318,33 @@ export default function Dashboard() {
 
                 <button
                   onClick={async () => {
+                    const result = await compactOfflineVault(30);
+                    const [m, q] = await Promise.all([
+                      getOfflineStorageMetrics(),
+                      getStorageQuotaEstimate(),
+                    ]);
+                    setOfflineMetrics(m);
+                    setStorageQuota(q);
+                    setLiveAlert(`🗜️ Compacted vault: pruned ${result.detailsPruned} unbookmarked detail caches (${result.remainingDetails} preserved)`);
+                    setTimeout(() => setLiveAlert(null), 3500);
+                  }}
+                  title="Prunes oldest unbookmarked story details while strictly preserving all bookmarked topics, custom notes, and pending offline sync actions"
+                  className="px-3 py-2 text-xs font-semibold bg-amber-950/40 hover:bg-amber-950/60 text-amber-300 border border-amber-800/60 rounded transition flex items-center space-x-1.5"
+                >
+                  <span>🗜️ Compact Vault</span>
+                </button>
+
+                <button
+                  onClick={async () => {
                     if (confirm("Purge IndexedDB and LocalStorage offline caches? Fresh data will be cached on subsequent requests.")) {
                       await clearOfflineIndexedDB();
                       localStorage.removeItem("omnifeed_cached_topics");
-                      const m = await getOfflineStorageMetrics();
+                      const [m, q] = await Promise.all([
+                        getOfflineStorageMetrics(),
+                        getStorageQuotaEstimate(),
+                      ]);
                       setOfflineMetrics(m);
+                      setStorageQuota(q);
                     }
                   }}
                   className="px-3 py-2 text-xs font-semibold bg-rose-950/40 hover:bg-rose-950/60 text-rose-300 border border-rose-800/60 rounded transition flex items-center space-x-1.5"
