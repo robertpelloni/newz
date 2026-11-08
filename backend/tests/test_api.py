@@ -430,3 +430,14 @@ def test_sources_health_summary_endpoint():
     assert data["total_sources"] == len(data["sources"])
     assert 0.0 <= data["uptime_percentage"] <= 100.0
     assert data["average_latency_ms"] >= 0.0
+
+def test_topics_search_across_correlated_articles():
+    # Query with a keyword common across news articles (e.g. 'Timeline' or 'deployments')
+    res = client.get("/api/topics?q=deployments")
+    assert res.status_code == 200
+    data = res.json()
+    assert "items" in data
+    assert isinstance(data["items"], list)
+    # Validate no duplicate topic ids returned from joins
+    ids = [t["id"] for t in data["items"]]
+    assert len(ids) == len(set(ids))

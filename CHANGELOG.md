@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.9.3] - 2026-11-08
+### Added
+- **Deep Text Search Across Correlated Articles & Bookmark Notes**:
+  - Expanded backend search in `GET /api/topics` and `GET /api/topics/export` (`backend/main.py`) to join correlated source articles (`ArticleTopic` -> `Article`), searching across topic title, summary, article headline, and raw article text content with distinct topic resolution.
+  - Enhanced client-side offline and bookmark search in `frontend/src/app/page.tsx` to search across custom bookmark annotation notes, categorization tags, and offline article text.
+  - Added automated unit test `test_topics_search_across_correlated_articles` in `backend/tests/test_api.py` (28/28 backend tests passing).
+  - Validated offline Playwright suite `scripts/test_offline_data_access.py` and visual UI responsiveness.
+
 ## [0.9.2] - 2026-11-08
 ### Added
 - **Subscribed Feed Health Diagnostics Summary & Channel Monitoring**:

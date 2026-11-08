@@ -837,14 +837,17 @@ export default function Dashboard() {
           );
         }
 
-        // Apply offline search query filter
+        // Apply offline search query filter (matching topic title, summary, custom notes, and tags)
         const q = searchQuery.trim().toLowerCase();
         if (q) {
-          filtered = filtered.filter(
-            (t) =>
-              (t.title && t.title.toLowerCase().includes(q)) ||
-              (t.summary && t.summary.toLowerCase().includes(q))
-          );
+          filtered = filtered.filter((t) => {
+            const matchTitle = t.title && t.title.toLowerCase().includes(q);
+            const matchSummary = t.summary && t.summary.toLowerCase().includes(q);
+            const noteObj = bookmarkAnnotations[t.id];
+            const matchNote = noteObj?.note && noteObj.note.toLowerCase().includes(q);
+            const matchTag = noteObj?.tags && noteObj.tags.some((tag) => tag.toLowerCase().includes(q.replace(/^#/, "")));
+            return matchTitle || matchSummary || matchNote || matchTag;
+          });
         }
 
         // Apply offline sorting
@@ -1539,6 +1542,15 @@ export default function Dashboard() {
                     if (activeBookmarkTagFilter) {
                       const tags = bookmarkAnnotations[t.id]?.tags || [];
                       if (!tags.includes(activeBookmarkTagFilter)) return false;
+                    }
+                    if (searchQuery.trim()) {
+                      const q = searchQuery.trim().toLowerCase();
+                      const matchTitle = t.title && t.title.toLowerCase().includes(q);
+                      const matchSummary = t.summary && t.summary.toLowerCase().includes(q);
+                      const noteObj = bookmarkAnnotations[t.id];
+                      const matchNote = noteObj?.note && noteObj.note.toLowerCase().includes(q);
+                      const matchTag = noteObj?.tags && noteObj.tags.some((tag) => tag.toLowerCase().includes(q.replace(/^#/, "")));
+                      if (!matchTitle && !matchSummary && !matchNote && !matchTag) return false;
                     }
                     return true;
                   })

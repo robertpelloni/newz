@@ -580,7 +580,16 @@ def get_topics(
     if category and category.lower() != "all":
         query = query.filter(models.Topic.category.ilike(f"%{category}%"))
     if q:
-        query = query.filter(models.Topic.title.ilike(f"%{q}%") | models.Topic.summary.ilike(f"%{q}%"))
+        search_term = f"%{q.strip()}%"
+        # Join correlated articles to enable deep textual search across full source reports
+        query = query.outerjoin(models.ArticleTopic, models.Topic.id == models.ArticleTopic.topic_id)\
+                     .outerjoin(models.Article, models.ArticleTopic.article_id == models.Article.id)\
+                     .filter(
+                         models.Topic.title.ilike(search_term) |
+                         models.Topic.summary.ilike(search_term) |
+                         models.Article.title.ilike(search_term) |
+                         models.Article.raw_content.ilike(search_term)
+                     ).distinct()
 
     total = query.count()
     topics = query.all()
@@ -645,7 +654,15 @@ def export_topics(
     if category and category.lower() != "all":
         query = query.filter(models.Topic.category.ilike(f"%{category}%"))
     if q:
-        query = query.filter(models.Topic.title.ilike(f"%{q}%") | models.Topic.summary.ilike(f"%{q}%"))
+        search_term = f"%{q.strip()}%"
+        query = query.outerjoin(models.ArticleTopic, models.Topic.id == models.ArticleTopic.topic_id)\
+                     .outerjoin(models.Article, models.ArticleTopic.article_id == models.Article.id)\
+                     .filter(
+                         models.Topic.title.ilike(search_term) |
+                         models.Topic.summary.ilike(search_term) |
+                         models.Article.title.ilike(search_term) |
+                         models.Article.raw_content.ilike(search_term)
+                     ).distinct()
 
     topics = query.all()
     data = []

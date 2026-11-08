@@ -64,3 +64,4 @@
 - [x] Custom bookmark annotation notes, tag taxonomies, and tag filtering (v0.9.0).
 - [x] Intermittent connectivity delta sync engine, latency telemetry, and partial replay retry (v0.9.1).
 - [x] Feed health diagnostics summary endpoint, uptime calculations, and UI warnings (v0.9.2).
+- [x] Deep text search across correlated source articles and offline bookmark annotation notes (v0.9.3).
