@@ -1,25 +1,25 @@
 # Omnifeed (Newz) - Session Handoff & Architecture Notes
 
-## Session Summary (v0.9.0)
-In this release iteration, we implemented custom bookmark annotation notes and tag taxonomies:
-1. **IndexedDB Annotation Vault (v3 Schema)**:
-   - Upgraded IndexedDB schema to `DB_VERSION = 3` with dedicated `bookmark_notes` object store in `frontend/src/utils/offlineStore.ts`.
-   - Added persistent client-side storage methods `saveBookmarkAnnotationToIndexedDB`, `getBookmarkAnnotationsFromIndexedDB`, and `deleteBookmarkAnnotationFromIndexedDB`.
-   - Included annotations count in `getOfflineStorageMetrics()`, wiped on `clearOfflineIndexedDB()`, and preserved on vault JSON archive export and restoration.
-2. **Interactive Note & Tag Management in UI**:
-   - Integrated full annotation editor in topic cluster deep-dive modal (`frontend/src/app/page.tsx`): custom analysis notes textarea, comma-separated `#tags` chip editor, and instant IndexedDB saving.
-   - Rendered inline notes and tags directly on bookmarked topic cards in the feed view.
-   - Added interactive tag filter pills (`#tag`) in the header filtering bar when viewing saved bookmarks.
-   - Enriched universal Reading List export in both JSON and Markdown formats (`handleExportBookmarks`) with custom notes and tags.
+## Session Summary (v0.9.1)
+In this release iteration, we implemented robust intermittent connectivity handling and an incremental delta sync engine:
+1. **Incremental Topic Delta Sync Backend Endpoint**:
+   - Implemented `GET /api/topics/delta?since=...&limit=...` in `backend/main.py`.
+   - Returns only topics created or updated after an ISO 8601 timestamp (`since`), optimizing transfers over low-bandwidth and intermittent connections.
+   - Added response schema `TopicDeltaResponse` in `backend/schemas.py`.
+   - Added automated test `test_topics_incremental_delta_sync` in `backend/tests/test_api.py` (26/26 backend tests passing).
+2. **Adaptive Reconnection, Queue Retry & Latency Telemetry**:
+   - Added interactive "🔄 Delta" sync trigger and live roundtrip latency indicator (`● Live WS <latency>ms`) to the header of `frontend/src/app/page.tsx`.
+   - Implemented automatic periodic 60-second background delta syncing and window online reconnection handlers.
+   - Enhanced offline queue replay with partial failure resilience: if an intermittent network drop occurs mid-replay, failed actions remain safely preserved in `omnifeed_sync_queue` rather than discarded.
 3. **Automated Testing & End-to-End Verification**:
-   - All 25 backend pytest tests pass in `backend/tests/test_api.py`.
-   - Updated and executed Playwright offline access test suite (`scripts/test_offline_data_access.py`) validating IndexedDB `bookmark_notes` persistence.
-   - Executed visual verification script capturing modal annotation editor (`/home/jules/verification/verify_annotation_modal.png`).
+   - All 26 backend pytest tests pass in `backend/tests/test_api.py`.
+   - Executed Playwright offline access test suite (`scripts/test_offline_data_access.py`) passing all 9/9 verification steps.
+   - Executed visual Playwright verification capturing the new Delta sync button and live network latency badge (`/home/jules/verification/verify_delta_sync_ui.png`).
    - Verified Next.js production build (`npm run build`).
-   - Synchronized single-source version `0.9.0` across `VERSION.md`, `frontend/src-tauri/tauri.conf.json`, `frontend/src-tauri/Cargo.toml`, `CHANGELOG.md`, `ROADMAP.md`, `TODO.md`, and `HANDOFF.md`.
+   - Synchronized single-source version `0.9.1` across `VERSION.md`, `frontend/src-tauri/tauri.conf.json`, `frontend/src-tauri/Cargo.toml`, `CHANGELOG.md`, `ROADMAP.md`, `TODO.md`, and `HANDOFF.md`.
 
 ## Active Runtime Environment:
-- **Current Version**: v0.9.0 (tracked in `VERSION.md`).
+- **Current Version**: v0.9.1 (tracked in `VERSION.md`).
 - **Git Branch**: `jules-6192871868108129425-4e3e34d4`
 - **Active Ports**:
   - FastAPI Backend: `http://localhost:8000` (PID managed, live telemetry delta streaming on `/api/ws/feed`)

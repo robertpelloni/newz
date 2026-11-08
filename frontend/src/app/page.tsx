@@ -128,6 +128,11 @@ export default function Dashboard() {
   const [audioAlertsEnabled, setAudioAlertsEnabled] = useState<boolean>(false);
   const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(false);
 
+  // Network State Diagnostics & Intermittent Connectivity Sync Engine
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [networkPingLatency, setNetworkPingLatency] = useState<number | null>(null);
+  const [isSyncingDelta, setIsSyncingDelta] = useState<boolean>(false);
+
   // Topic Deep-Dive Timeline & Entity Options
   const [timelineOrder, setTimelineOrder] = useState<"asc" | "desc">("asc");
   const [timelinePolarityFilter, setTimelinePolarityFilter] = useState<"all" | "positive" | "negative">("all");
@@ -212,36 +217,57 @@ export default function Dashboard() {
       const replayOfflineQueue = async () => {
         setIsOffline(false);
         try {
-          const queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+          const queue: Array<any> = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
           if (queue.length > 0) {
             setLiveAlert(`Replaying ${queue.length} offline queued actions...`);
+            const remaining: Array<any> = [];
             for (const action of queue) {
-              if (action.type === "sync_feeds") {
-                await fetch(`${API_BASE}/api/actions/sync`, { method: "POST" }).catch(() => {});
-              } else if (action.type === "add_feed" && action.payload) {
-                await fetch(`${API_BASE}/api/sources`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(action.payload),
-                }).catch(() => {});
-              } else if (action.type === "delete_feed" && action.source_id) {
-                await fetch(`${API_BASE}/api/sources/${action.source_id}`, {
-                  method: "DELETE",
-                }).catch(() => {});
+              try {
+                if (action.type === "sync_feeds") {
+                  const res = await fetch(`${API_BASE}/api/actions/sync`, { method: "POST" });
+                  if (!res.ok) throw new Error("Sync failed");
+                } else if (action.type === "add_feed" && action.payload) {
+                  const res = await fetch(`${API_BASE}/api/sources`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(action.payload),
+                  });
+                  if (!res.ok) throw new Error("Add feed failed");
+                } else if (action.type === "delete_feed" && action.source_id) {
+                  const res = await fetch(`${API_BASE}/api/sources/${action.source_id}`, {
+                    method: "DELETE",
+                  });
+                  if (!res.ok) throw new Error("Delete feed failed");
+                }
+              } catch (err) {
+                // If an intermittent drop occurs during replay, retain unplayed actions
+                remaining.push(action);
               }
             }
-            localStorage.removeItem("omnifeed_sync_queue");
-            setPendingSyncCount(0);
+            if (remaining.length > 0) {
+              localStorage.setItem("omnifeed_sync_queue", JSON.stringify(remaining));
+              setPendingSyncCount(remaining.length);
+              setLiveAlert(`Partial connection: ${remaining.length} action(s) retained in queue.`);
+            } else {
+              localStorage.removeItem("omnifeed_sync_queue");
+              setPendingSyncCount(0);
+              setLiveAlert("All offline queued actions synchronized successfully!");
+            }
             fetchSystemData();
             fetchTopics();
-            setTimeout(() => setLiveAlert(null), 3000);
+            setLastSyncTime(new Date().toLocaleTimeString());
+            setTimeout(() => setLiveAlert(null), 3500);
           }
         } catch (e) {
           console.error("Queue replay error:", e);
         }
       };
 
-      const handleOnline = () => replayOfflineQueue();
+      const handleOnline = () => {
+        setIsOffline(false);
+        replayOfflineQueue();
+        triggerIncrementalDeltaSync();
+      };
       const handleOffline = () => setIsOffline(true);
       window.addEventListener("online", handleOnline);
       window.addEventListener("offline", handleOffline);
@@ -310,6 +336,44 @@ export default function Dashboard() {
       };
     }
   }, []);
+
+  const triggerIncrementalDeltaSync = async () => {
+    if (isSyncingDelta) return;
+    setIsSyncingDelta(true);
+    const pingStart = Date.now();
+    try {
+      const lastCheck = localStorage.getItem("omnifeed_last_delta_sync");
+      const url = new URL(`${API_BASE}/api/topics/delta`);
+      url.searchParams.append("limit", "25");
+      if (lastCheck) {
+        url.searchParams.append("since", lastCheck);
+      }
+      const res = await fetch(url.toString());
+      setNetworkPingLatency(Date.now() - pingStart);
+      if (res.ok) {
+        const delta = await res.json();
+        if (delta.server_time) {
+          localStorage.setItem("omnifeed_last_delta_sync", delta.server_time);
+        }
+        if (Array.isArray(delta.topics) && delta.topics.length > 0) {
+          await saveTopicsToIndexedDB(delta.topics);
+          setTopics((prev) => {
+            const map = new Map<number, Topic>();
+            delta.topics.forEach((t: Topic) => map.set(t.id, t));
+            prev.forEach((t) => { if (!map.has(t.id)) map.set(t.id, t); });
+            return Array.from(map.values()).slice(0, pageSize);
+          });
+          setLiveAlert(`Delta Sync: ${delta.topics.length} new or updated topic(s) ingested.`);
+          setTimeout(() => setLiveAlert(null), 3000);
+        }
+        setLastSyncTime(new Date().toLocaleTimeString());
+      }
+    } catch (err) {
+      console.warn("Incremental delta sync skipped:", err);
+    } finally {
+      setIsSyncingDelta(false);
+    }
+  };
 
   const toggleBookmark = (id: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -463,9 +527,17 @@ export default function Dashboard() {
     connectWebSocket();
 
     const interval = setInterval(fetchSystemData, 15000);
+    // Periodic incremental delta sync (every 60s) for intermittent connectivity networks
+    const deltaInterval = setInterval(() => {
+      if (navigator.onLine && !isOffline) {
+        triggerIncrementalDeltaSync();
+      }
+    }, 60000);
+
     return () => {
       isUnmounted = true;
       clearInterval(interval);
+      clearInterval(deltaInterval);
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       if (ws) ws.close();
     };
@@ -1009,29 +1081,51 @@ export default function Dashboard() {
 
         {/* Global Controls & Status Indicators */}
         <div className="flex items-center space-x-3">
+          {/* Real-time Network Latency & Sync Pulse */}
           <div
             title={
-              wsConnected
-                ? "WebSocket stream active: real-time live ingestion and firehose updates connected"
-                : wsReconnectAttempts > 0
-                ? `WebSocket disconnected: automatic reconnection active (attempt ${wsReconnectAttempts}), falling back to background HTTP polling`
-                : "WebSocket offline: using background HTTP polling"
+              isOffline
+                ? "Network Disconnected: Local offline cache and queue active"
+                : `Network Active: ${networkPingLatency !== null ? `${networkPingLatency}ms latency` : "Connected"} (Last Sync: ${lastSyncTime || "Just now"})`
             }
-            className="flex items-center space-x-2 text-xs bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700/80 cursor-help"
+            className="flex items-center space-x-1.5 text-xs bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700/80 cursor-help"
           >
             <span
               className={`inline-block w-2 h-2 rounded-full ${
-                wsConnected
+                isOffline
+                  ? "bg-rose-500"
+                  : wsConnected
                   ? "bg-emerald-400 animate-pulse"
                   : wsReconnectAttempts > 0
                   ? "bg-amber-400 animate-ping"
-                  : "bg-amber-500"
+                  : "bg-cyan-400"
               }`}
             />
             <span className="text-slate-300 font-medium hidden sm:inline">
-              {wsConnected ? "Live WS" : wsReconnectAttempts > 0 ? `Reconnecting (${wsReconnectAttempts})` : "Polling"}
+              {isOffline
+                ? "Offline"
+                : wsConnected
+                ? "Live WS"
+                : wsReconnectAttempts > 0
+                ? `Reconnecting (${wsReconnectAttempts})`
+                : "Polling"}
             </span>
+            {networkPingLatency !== null && !isOffline && (
+              <span className="text-[10px] text-cyan-300 font-mono hidden md:inline">
+                {networkPingLatency}ms
+              </span>
+            )}
           </div>
+
+          {/* Manual Incremental Delta Sync Button */}
+          <button
+            onClick={triggerIncrementalDeltaSync}
+            disabled={isSyncingDelta || isOffline}
+            title="Perform lightweight delta synchronization for new/updated topics over low-bandwidth or intermittent connections"
+            className="px-2.5 py-1.5 text-xs font-semibold rounded border border-slate-700 bg-slate-800 hover:bg-slate-700 text-cyan-300 transition flex items-center space-x-1 disabled:opacity-40"
+          >
+            <span>{isSyncingDelta ? "🔄 Syncing..." : "🔄 Delta"}</span>
+          </button>
 
           {/* Autopilot Ingestion Toggle */}
           <button

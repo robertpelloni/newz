@@ -62,3 +62,4 @@
 - [x] OPML 2.0 feed subscription export and bulk outline import pipeline (v0.8.8).
 - [x] IndexedDB feed vault and disconnected channel synchronization resilience (v0.8.9).
 - [x] Custom bookmark annotation notes, tag taxonomies, and tag filtering (v0.9.0).
+- [x] Intermittent connectivity delta sync engine, latency telemetry, and partial replay retry (v0.9.1).

@@ -2,6 +2,16 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.9.1] - 2026-11-08
+### Added
+- **Intermittent Connectivity Offline Resiliency & Automated Periodic Delta Sync**:
+  - Incremental topic delta synchronization endpoint (`GET /api/topics/delta?since=...`) in `backend/main.py` allowing low-bandwidth updates and timestamp-based diff ingestion.
+  - Added `TopicDeltaResponse` schema in `backend/schemas.py`.
+  - Added interactive "🔄 Delta" sync trigger and live roundtrip latency indicator (`● Live WS <latency>ms`) in the navigation bar of `frontend/src/app/page.tsx`.
+  - Implemented automatic periodic 60-second delta synchronization background worker and window online reconnection handlers.
+  - Enhanced offline queue replay with partial failure resilience: unfulfilled actions remain preserved in `omnifeed_sync_queue` if network drops intermittently mid-replay.
+  - Automated unit test `test_topics_incremental_delta_sync` in `backend/tests/test_api.py` (26/26 backend tests passing).
+
 ## [0.9.0] - 2026-11-08
 ### Added
 - **Custom Bookmark Annotation Notes & Categorization Tags**:

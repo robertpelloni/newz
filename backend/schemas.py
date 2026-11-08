@@ -78,3 +78,9 @@ class TopicDeepDive(BaseModel):
     articles: List[ArticleResponse]
     discussions: List[DiscussionResponse]
     sentiments: List[SentimentResponse]
+
+class TopicDeltaResponse(BaseModel):
+    server_time: datetime
+    since: Optional[datetime] = None
+    topics_count: int
+    topics: List[Dict[str, Any]]

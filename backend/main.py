@@ -454,6 +454,60 @@ async def import_sources_opml(request: Request, db: Session = Depends(get_db)):
     }
 
 
+@app.get("/api/topics/delta", response_model=schemas.TopicDeltaResponse)
+def get_topics_delta(
+    since: Optional[str] = Query(None, description="ISO 8601 timestamp to retrieve topics updated strictly after"),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db)
+):
+    """Retrieve incremental topic updates modified or created after a specified timestamp for low-bandwidth delta syncing."""
+    from datetime import datetime, timezone
+
+    since_dt = None
+    if since:
+        try:
+            # Handle potential trailing Z or ISO formats
+            clean_since = since.replace("Z", "+00:00")
+            since_dt = datetime.fromisoformat(clean_since)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid ISO timestamp format for 'since'. Expected format: YYYY-MM-DDTHH:MM:SSZ")
+
+    query = db.query(models.Topic)
+    if since_dt:
+        query = query.filter(models.Topic.last_updated > since_dt)
+
+    topics = query.order_by(models.Topic.last_updated.desc()).limit(limit).all()
+
+    results = []
+    for t in topics:
+        article_count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
+        latest_sentiment = db.query(models.Sentiment).filter(models.Sentiment.topic_id == t.id).order_by(models.Sentiment.id.desc()).first()
+        controversy_score = 0.0
+        sentiment_score = 0.0
+        if latest_sentiment and latest_sentiment.breakdown_json:
+            controversy_score = latest_sentiment.breakdown_json.get("controversy", 0.0)
+            sentiment_score = latest_sentiment.overall_score or 0.0
+
+        results.append({
+            "id": t.id,
+            "title": t.title,
+            "summary": t.summary,
+            "category": t.category,
+            "first_seen": t.first_seen.isoformat() if t.first_seen else None,
+            "last_updated": t.last_updated.isoformat() if t.last_updated else None,
+            "article_count": article_count,
+            "controversy_score": round(controversy_score, 2),
+            "sentiment_score": round(sentiment_score, 2),
+            "is_breaking": (controversy_score >= 0.4 or article_count >= 15),
+        })
+
+    return {
+        "server_time": datetime.now(timezone.utc),
+        "since": since_dt,
+        "topics_count": len(results),
+        "topics": results
+    }
+
 @app.get("/api/topics")
 def get_topics(
     page: int = Query(1, ge=1),

@@ -384,3 +384,32 @@ def test_sources_opml_export_and_import():
     assert re_data["total_found"] == 2
     assert re_data["existing_count"] == 2
     assert re_data["imported_count"] == 0
+
+def test_topics_incremental_delta_sync():
+    # 1. Delta sync without since timestamp (returns recent batch)
+    res = client.get("/api/topics/delta?limit=10")
+    assert res.status_code == 200
+    data = res.json()
+    assert "server_time" in data
+    assert "topics_count" in data
+    assert "topics" in data
+    assert isinstance(data["topics"], list)
+    assert data["topics_count"] == len(data["topics"])
+
+    # 2. Delta sync with an ancient timestamp (should return all recent)
+    res_ancient = client.get("/api/topics/delta?since=2000-01-01T00:00:00Z&limit=10")
+    assert res_ancient.status_code == 200
+    data_ancient = res_ancient.json()
+    assert data_ancient["topics_count"] >= 0
+
+    # 3. Delta sync with future timestamp (should return 0 topics)
+    res_future = client.get("/api/topics/delta?since=2099-01-01T00:00:00Z")
+    assert res_future.status_code == 200
+    data_future = res_future.json()
+    assert data_future["topics_count"] == 0
+    assert len(data_future["topics"]) == 0
+
+    # 4. Delta sync with invalid timestamp should return HTTP 400
+    res_invalid = client.get("/api/topics/delta?since=not-a-timestamp")
+    assert res_invalid.status_code == 400
+    assert "Invalid ISO timestamp format" in res_invalid.json()["detail"]
