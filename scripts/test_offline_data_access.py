@@ -15,7 +15,8 @@ def test_offline_caching_and_sync():
 
         # Step 1: Prime cache online
         print("[2/9] Navigating while online to prime Service Worker, LocalStorage, and IndexedDB...")
-        page.goto("http://localhost:3000", wait_until="networkidle")
+        page.goto("http://localhost:3000", wait_until="domcontentloaded")
+        page.wait_for_selector("text=OMNIFEED", timeout=10000)
         time.sleep(2)
 
         # Check topics loaded

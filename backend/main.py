@@ -332,6 +332,64 @@ def ping_all_sources(db: Session = Depends(get_db)):
                 })
     return sorted(results, key=lambda x: x["id"])
 
+@app.get("/api/sources/health-summary", response_model=schemas.SourceHealthSummaryResponse)
+def get_sources_health_summary(db: Session = Depends(get_db)):
+    """Aggregate real-time reachability, latency diagnostics, and uptime statistics across all registered feed sources."""
+    import concurrent.futures
+    from datetime import datetime, timezone
+
+    sources = db.query(models.Source).all()
+    if not sources:
+        return {
+            "total_sources": 0,
+            "healthy_count": 0,
+            "degraded_count": 0,
+            "unreachable_count": 0,
+            "uptime_percentage": 100.0,
+            "average_latency_ms": 0.0,
+            "probed_at": datetime.now(timezone.utc),
+            "sources": []
+        }
+
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sources), 8)) as executor:
+        future_to_source = {executor.submit(probe_single_source, s): s for s in sources}
+        for future in concurrent.futures.as_completed(future_to_source):
+            try:
+                results.append(future.result())
+            except Exception:
+                s = future_to_source[future]
+                results.append({
+                    "id": s.id,
+                    "name": s.name,
+                    "url": s.url,
+                    "status": "unreachable",
+                    "latency_ms": 0.0,
+                    "http_code": None
+                })
+
+    sorted_results = sorted(results, key=lambda x: x["id"])
+    healthy_count = sum(1 for r in sorted_results if r["status"] == "healthy")
+    degraded_count = sum(1 for r in sorted_results if r["status"] == "degraded")
+    unreachable_count = sum(1 for r in sorted_results if r["status"] == "unreachable")
+
+    total = len(sorted_results)
+    uptime_pct = round(((healthy_count + (0.5 * degraded_count)) / total) * 100.0, 1) if total > 0 else 100.0
+
+    valid_latencies = [r["latency_ms"] for r in sorted_results if r["latency_ms"] > 0]
+    avg_latency = round(sum(valid_latencies) / len(valid_latencies), 1) if valid_latencies else 0.0
+
+    return {
+        "total_sources": total,
+        "healthy_count": healthy_count,
+        "degraded_count": degraded_count,
+        "unreachable_count": unreachable_count,
+        "uptime_percentage": uptime_pct,
+        "average_latency_ms": avg_latency,
+        "probed_at": datetime.now(timezone.utc),
+        "sources": sorted_results
+    }
+
 
 @app.get("/api/sources/opml")
 def export_sources_opml(db: Session = Depends(get_db)):

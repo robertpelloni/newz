@@ -2,6 +2,15 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.9.2] - 2026-11-08
+### Added
+- **Subscribed Feed Health Diagnostics Summary & Channel Monitoring**:
+  - Implemented `GET /api/sources/health-summary` in `backend/main.py` aggregating reachability, concurrent latency measurements, and system uptime percentages across all registered feed sources.
+  - Added `SourceHealthSummaryResponse` schema in `backend/schemas.py`.
+  - Added dynamic uptime percentage and latency telemetry badges in the "Feed Sources & Subscriptions" modal of `frontend/src/app/page.tsx`.
+  - Added real-time degraded channel warnings (`⚠️ <count>`) on the navbar Feeds button.
+  - Added automated unit and integration test `test_sources_health_summary_endpoint` in `backend/tests/test_api.py` (27/27 backend tests passing).
+
 ## [0.9.1] - 2026-11-08
 ### Added
 - **Intermittent Connectivity Offline Resiliency & Automated Periodic Delta Sync**:

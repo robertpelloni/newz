@@ -141,6 +141,14 @@ export default function Dashboard() {
   // Custom Feed Management State
   const [showFeedsModal, setShowFeedsModal] = useState<boolean>(false);
   const [feedSources, setFeedSources] = useState<FeedSource[]>([]);
+  const [feedHealthSummary, setFeedHealthSummary] = useState<{
+    total: number;
+    healthy: number;
+    degraded: number;
+    unreachable: number;
+    uptimePct: number;
+    avgLatency: number;
+  } | null>(null);
   const [newFeedName, setNewFeedName] = useState<string>("");
   const [newFeedUrl, setNewFeedUrl] = useState<string>("");
   const [newFeedType, setNewFeedType] = useState<string>("tech");
@@ -582,6 +590,26 @@ export default function Dashboard() {
         localStorage.setItem("omnifeed_sources_cache", JSON.stringify(sourcesData));
         await saveSourcesToIndexedDB(sourcesData);
       }
+
+      // Check feed health summary
+      fetch(`${API_BASE}/api/sources/health-summary`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((health) => {
+          if (health) {
+            setFeedHealthSummary({
+              total: health.total_sources,
+              healthy: health.healthy_count,
+              degraded: health.degraded_count,
+              unreachable: health.unreachable_count,
+              uptimePct: health.uptime_percentage,
+              avgLatency: health.average_latency_ms,
+            });
+            try {
+              localStorage.setItem("omnifeed_sources_health_summary", JSON.stringify(health));
+            } catch (_) {}
+          }
+        })
+        .catch(() => {});
     } catch (e) {
       console.error("Error fetching status or pulse:", e);
       const idbSources = await getSourcesFromIndexedDB();
@@ -1170,16 +1198,24 @@ export default function Dashboard() {
             {audioAlertsEnabled ? "🔔 Audio On" : "🔕 Audio"}
           </button>
 
-          {/* Manage Feeds Button */}
+          {/* Manage Feeds Button with Health Indicator */}
           <button
             onClick={() => setShowFeedsModal(true)}
-            title="Manage and subscribe to custom RSS/Atom feed sources"
+            title={`Manage RSS/Atom feeds (${feedSources.length} active)${feedHealthSummary ? ` - Uptime: ${feedHealthSummary.uptimePct}%` : ""}`}
             className="px-2.5 py-1.5 text-xs font-semibold rounded border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex items-center space-x-1"
           >
             <span>📡 Feeds</span>
             {feedSources.length > 0 && (
               <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.2 rounded-full font-bold">
                 {feedSources.length}
+              </span>
+            )}
+            {feedHealthSummary && feedHealthSummary.unreachable > 0 && (
+              <span
+                title={`${feedHealthSummary.unreachable} feed(s) unreachable or degraded`}
+                className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1 py-0.2 rounded font-bold"
+              >
+                ⚠️ {feedHealthSummary.unreachable}
               </span>
             )}
           </button>
@@ -2196,11 +2232,23 @@ export default function Dashboard() {
             </button>
 
             <div>
-              <h3 className="text-lg font-bold text-white flex items-center space-x-2">
-                <span>📡 Feed Sources & Subscriptions</span>
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-white flex items-center space-x-2">
+                  <span>📡 Feed Sources & Subscriptions</span>
+                </h3>
+                {feedHealthSummary && (
+                  <div className="flex items-center space-x-2 text-[10px]">
+                    <span className="bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded font-mono font-bold">
+                      {feedHealthSummary.uptimePct}% Uptime
+                    </span>
+                    <span className="bg-slate-800 text-cyan-300 border border-slate-700 px-2 py-0.5 rounded font-mono">
+                      ~{feedHealthSummary.avgLatency}ms
+                    </span>
+                  </div>
+                )}
+              </div>
               <p className="text-xs text-slate-400 mt-1">
-                Configure news wires, custom RSS/Atom feeds, and social ingestion channels.
+                Configure news wires, custom RSS/Atom feeds, and monitor real-time channel health.
               </p>
             </div>
 

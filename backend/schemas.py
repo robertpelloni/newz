@@ -73,6 +73,16 @@ class OPMLImportResponse(BaseModel):
     total_found: int
     sources: List[OPMLImportItem]
 
+class SourceHealthSummaryResponse(BaseModel):
+    total_sources: int
+    healthy_count: int
+    degraded_count: int
+    unreachable_count: int
+    uptime_percentage: float
+    average_latency_ms: float
+    probed_at: datetime
+    sources: List[SourcePingResponse]
+
 class TopicDeepDive(BaseModel):
     topic: TopicResponse
     articles: List[ArticleResponse]

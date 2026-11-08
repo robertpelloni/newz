@@ -413,3 +413,20 @@ def test_topics_incremental_delta_sync():
     res_invalid = client.get("/api/topics/delta?since=not-a-timestamp")
     assert res_invalid.status_code == 400
     assert "Invalid ISO timestamp format" in res_invalid.json()["detail"]
+
+def test_sources_health_summary_endpoint():
+    res = client.get("/api/sources/health-summary")
+    assert res.status_code == 200
+    data = res.json()
+    assert "total_sources" in data
+    assert "healthy_count" in data
+    assert "degraded_count" in data
+    assert "unreachable_count" in data
+    assert "uptime_percentage" in data
+    assert "average_latency_ms" in data
+    assert "probed_at" in data
+    assert "sources" in data
+    assert isinstance(data["sources"], list)
+    assert data["total_sources"] == len(data["sources"])
+    assert 0.0 <= data["uptime_percentage"] <= 100.0
+    assert data["average_latency_ms"] >= 0.0
