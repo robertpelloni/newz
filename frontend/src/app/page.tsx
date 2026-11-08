@@ -136,6 +136,9 @@ export default function Dashboard() {
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
   const [platformName, setPlatformName] = useState<string>("Web");
   const [audioAlertsEnabled, setAudioAlertsEnabled] = useState<boolean>(false);
+  const [audioVolume, setAudioVolume] = useState<number>(0.5);
+  const [alertTone, setAlertTone] = useState<"chime" | "radar" | "sonar">("chime");
+  const [showAudioSettings, setShowAudioSettings] = useState<boolean>(false);
   const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(false);
 
   // Network State Diagnostics & Intermittent Connectivity Sync Engine
@@ -196,7 +199,7 @@ export default function Dashboard() {
 
   const categories = ["All", "General", "Technology", "Business", "Politics", "Science", "Entertainment"];
 
-  const playChime = () => {
+  const playChime = (toneOverride?: "chime" | "radar" | "sonar", volumeOverride?: number) => {
     try {
       if (typeof window === "undefined") return;
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -204,15 +207,44 @@ export default function Dashboard() {
       const ctx = new AudioCtx();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
-      gain.gain.setValueAtTime(0.1, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.3);
+
+      const selectedTone = toneOverride || alertTone;
+      const effectiveVolume = typeof volumeOverride === "number" ? volumeOverride : audioVolume;
+      const baseGain = Math.max(0.01, effectiveVolume * 0.15);
+
+      if (selectedTone === "radar") {
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(440, ctx.currentTime); // A4
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.08); // E5
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.16); // A5
+        gain.gain.setValueAtTime(baseGain, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.35);
+      } else if (selectedTone === "sonar") {
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(783.99, ctx.currentTime); // G5
+        osc.frequency.exponentialRampToValueAtTime(392.00, ctx.currentTime + 0.3); // G4 drop
+        gain.gain.setValueAtTime(baseGain * 1.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+      } else {
+        // Classic pleasant chime
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
+        gain.gain.setValueAtTime(baseGain, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.3);
+      }
     } catch {
       // AudioContext unavailable or blocked by browser policy
     }
@@ -235,6 +267,19 @@ export default function Dashboard() {
       }
 
       setIsOffline(!navigator.onLine);
+
+      // Load saved audio preferences
+      try {
+        const savedVol = localStorage.getItem("omnifeed_audio_volume");
+        if (savedVol !== null) {
+          const parsed = parseFloat(savedVol);
+          if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) setAudioVolume(parsed);
+        }
+        const savedTone = localStorage.getItem("omnifeed_alert_tone");
+        if (savedTone === "chime" || savedTone === "radar" || savedTone === "sonar") {
+          setAlertTone(savedTone);
+        }
+      } catch (_) {}
 
       // Check pending offline sync actions queue
       const checkSyncQueue = async () => {
@@ -1386,22 +1431,102 @@ export default function Dashboard() {
             <span>{autopilotEnabled ? "⚡ Autopilot On" : "⚡ Autopilot"}</span>
           </button>
 
-          {/* Audio Chime Alert Toggle */}
-          <button
-            onClick={() => {
-              const nextState = !audioAlertsEnabled;
-              setAudioAlertsEnabled(nextState);
-              if (nextState) playChime();
-            }}
-            title={audioAlertsEnabled ? "Audio chimes enabled for breaking news events" : "Enable audio chimes for breaking news events"}
-            className={`px-2.5 py-1.5 text-xs font-semibold rounded border transition ${
-              audioAlertsEnabled
-                ? "bg-amber-500/20 text-amber-400 border-amber-500/50"
-                : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
-            }`}
-          >
-            {audioAlertsEnabled ? "🔔 Audio On" : "🔕 Audio"}
-          </button>
+          {/* Audio Chime Notification Toggle & Volume Controls */}
+          <div className="relative inline-flex items-center">
+            <button
+              onClick={() => {
+                const nextState = !audioAlertsEnabled;
+                setAudioAlertsEnabled(nextState);
+                if (nextState) playChime();
+              }}
+              title={audioAlertsEnabled ? "Audio chimes enabled for breaking news events" : "Enable audio chimes for breaking news events"}
+              className={`px-2.5 py-1.5 text-xs font-semibold rounded-l border transition ${
+                audioAlertsEnabled
+                  ? "bg-amber-500/20 text-amber-400 border-amber-500/50"
+                  : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
+              }`}
+            >
+              {audioAlertsEnabled ? "🔔 Audio On" : "🔕 Audio"}
+            </button>
+            <button
+              onClick={() => setShowAudioSettings((prev) => !prev)}
+              title="Configure audio chime volume and tone synthesis"
+              className={`px-1.5 py-1.5 text-xs font-semibold rounded-r border-t border-r border-b transition ${
+                audioAlertsEnabled
+                  ? "bg-amber-950/40 text-amber-400 border-amber-500/50 hover:bg-amber-900/60"
+                  : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200 hover:bg-slate-700"
+              }`}
+            >
+              ⚙
+            </button>
+
+            {/* Audio volume popover */}
+            {showAudioSettings && (
+              <div className="absolute top-full mt-2 left-0 z-50 w-56 bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-2xl space-y-3 animate-fade-in">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-200">
+                  <span>Audio Alert Preferences</span>
+                  <button
+                    onClick={() => setShowAudioSettings(false)}
+                    className="text-slate-400 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>Volume</span>
+                    <span className="font-mono text-cyan-400 font-bold">{Math.round(audioVolume * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={audioVolume}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setAudioVolume(val);
+                      localStorage.setItem("omnifeed_audio_volume", val.toString());
+                    }}
+                    className="w-full accent-cyan-400 cursor-pointer h-1.5 bg-slate-800 rounded-lg appearance-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[11px] text-slate-400 block">Tone Profile</span>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(["chime", "radar", "sonar"] as const).map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => {
+                          setAlertTone(t);
+                          localStorage.setItem("omnifeed_alert_tone", t);
+                          playChime(t);
+                        }}
+                        className={`px-2 py-1 text-[10px] font-bold uppercase rounded border transition ${
+                          alertTone === t
+                            ? "bg-cyan-950 text-cyan-300 border-cyan-600"
+                            : "bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700"
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-1 border-t border-slate-800 flex justify-between items-center">
+                  <button
+                    onClick={() => playChime()}
+                    className="w-full px-2 py-1 text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded transition flex items-center justify-center space-x-1"
+                  >
+                    <span>▶ Test Audio Alert</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Manage Feeds Button with Health Indicator */}
           <button

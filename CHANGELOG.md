@@ -2,6 +2,13 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [1.0.2] - 2026-11-08
+### Added
+- **Audio Alert Volume & Tone Synthesis Controls**:
+  - Implemented configurable audio volume slider (0% to 100%) and tone profile synthesis (`chime`, `radar`, `sonar`) via Web Audio API without external audio dependencies.
+  - Added persistent audio preferences in LocalStorage (`omnifeed_audio_volume`, `omnifeed_alert_tone`).
+  - Added popover configuration UI with live audio alert test playback in the header operations bar.
+
 ## [1.0.1] - 2026-11-08
 ### Added
 - **Sync Audit Logging & Conflict History**:

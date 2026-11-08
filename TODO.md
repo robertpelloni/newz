@@ -73,3 +73,4 @@
 - [x] Periodic automated feed health heartbeat probe & diagnostics telemetry (v0.9.9).
 - [x] Production General Availability release v1.0.0 and numerical category domain hotkeys (v1.0.0).
 - [x] Offline sync audit history logging, conflict drawer inspector, and resilient queue reconciliation (v1.0.1).
+- [x] Audio alert volume slider, tone profiles (chime, radar, sonar), and live test controls (v1.0.2).
