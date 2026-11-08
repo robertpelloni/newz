@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import Response, JSONResponse
 from sqlalchemy.orm import Session
 from typing import Optional, List, Set
@@ -331,6 +331,128 @@ def ping_all_sources(db: Session = Depends(get_db)):
                     "http_code": None
                 })
     return sorted(results, key=lambda x: x["id"])
+
+
+@app.get("/api/sources/opml")
+def export_sources_opml(db: Session = Depends(get_db)):
+    """Export all registered RSS and Atom feed subscriptions as a standard OPML 2.0 XML document."""
+    import xml.etree.ElementTree as ET
+    from datetime import datetime, timezone
+
+    sources = db.query(models.Source).all()
+
+    opml = ET.Element("opml", version="2.0")
+    head = ET.SubElement(opml, "head")
+    title = ET.SubElement(head, "title")
+    title.text = "OmniFeed Subscriptions"
+    date_created = ET.SubElement(head, "dateCreated")
+    date_created.text = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
+    docs = ET.SubElement(head, "docs")
+    docs.text = "http://opml.org/spec2.opml"
+
+    body = ET.SubElement(opml, "body")
+    outlines_group = ET.SubElement(body, "outline", text="Feeds", title="Feeds")
+
+    for s in sources:
+        outline_attrs = {
+            "text": s.name or "Untitled Feed",
+            "title": s.name or "Untitled Feed",
+            "type": "rss" if s.type in ("rss", "mainstream", "aggregator") else s.type,
+            "xmlUrl": s.url,
+            "htmlUrl": s.url
+        }
+        ET.SubElement(outlines_group, "outline", **outline_attrs)
+
+    xml_declaration = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml_content = xml_declaration + ET.tostring(opml, encoding="utf-8").decode("utf-8")
+    return Response(content=xml_content, media_type="application/xml; charset=utf-8", headers={
+        "Content-Disposition": "attachment; filename=omnifeed-subscriptions.opml"
+    })
+
+
+@app.post("/api/sources/opml", response_model=schemas.OPMLImportResponse)
+async def import_sources_opml(request: Request, db: Session = Depends(get_db)):
+    """Import and register RSS/Atom feed subscriptions from an uploaded OPML document."""
+    import xml.etree.ElementTree as ET
+
+    content_type = request.headers.get("content-type", "")
+    body_bytes = await request.body()
+    xml_str = ""
+
+    if "application/json" in content_type:
+        try:
+            data = json.loads(body_bytes.decode("utf-8"))
+            xml_str = data.get("opml", "") or data.get("xml", "") or data.get("content", "")
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON payload.")
+    else:
+        xml_str = body_bytes.decode("utf-8", errors="replace")
+
+    if not xml_str.strip():
+        raise HTTPException(status_code=400, detail="Empty OPML content provided.")
+
+    try:
+        root = ET.fromstring(xml_str.strip())
+    except ET.ParseError as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse OPML XML: {str(e)}")
+
+    imported_items = []
+    imported_count = 0
+    existing_count = 0
+
+    for outline in root.findall(".//outline"):
+        xml_url = outline.get("xmlUrl") or outline.get("url")
+        if not xml_url:
+            continue
+
+        xml_url = xml_url.strip()
+        feed_name = outline.get("title") or outline.get("text") or outline.get("name") or xml_url
+        feed_type = outline.get("type", "rss").strip().lower()
+        if feed_type not in ["rss", "atom", "mainstream", "aggregator", "social"]:
+            feed_type = "rss"
+
+        existing = db.query(models.Source).filter(models.Source.url == xml_url).first()
+        if existing:
+            existing_count += 1
+            imported_items.append({
+                "name": existing.name,
+                "url": existing.url,
+                "type": existing.type,
+                "status": "existing"
+            })
+        else:
+            try:
+                new_s = models.Source(
+                    name=feed_name.strip(),
+                    type=feed_type,
+                    url=xml_url
+                )
+                db.add(new_s)
+                db.commit()
+                db.refresh(new_s)
+                imported_count += 1
+                imported_items.append({
+                    "name": new_s.name,
+                    "url": new_s.url,
+                    "type": new_s.type,
+                    "status": "created"
+                })
+            except Exception:
+                db.rollback()
+                imported_items.append({
+                    "name": feed_name.strip(),
+                    "url": xml_url,
+                    "type": feed_type,
+                    "status": "failed"
+                })
+
+    return {
+        "imported_count": imported_count,
+        "existing_count": existing_count,
+        "total_found": len(imported_items),
+        "sources": imported_items
+    }
+
 
 @app.get("/api/topics")
 def get_topics(

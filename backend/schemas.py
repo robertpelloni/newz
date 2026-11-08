@@ -61,6 +61,18 @@ class SourcePingResponse(BaseModel):
     latency_ms: float
     http_code: Optional[int] = None
 
+class OPMLImportItem(BaseModel):
+    name: str
+    url: str
+    type: str = "rss"
+    status: str  # "created", "existing", "failed"
+
+class OPMLImportResponse(BaseModel):
+    imported_count: int
+    existing_count: int
+    total_found: int
+    sources: List[OPMLImportItem]
+
 class TopicDeepDive(BaseModel):
     topic: TopicResponse
     articles: List[ArticleResponse]

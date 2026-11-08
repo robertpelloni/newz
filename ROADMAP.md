@@ -55,5 +55,6 @@
 - [x] Topic Narrative Entity Matrix & Cross-Article Citations (v0.8.5).
 - [x] Scoped Sentiment Pulse Radar & Domain-Filtered Polarity (v0.8.6).
 - [x] Sorted Intelligence Reports Export & Polarity Scoring Metrics (v0.8.7).
+- [x] OPML 2.0 Feed Subscription Export & Bulk Import Engine (v0.8.8).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

@@ -334,3 +334,53 @@ def test_export_topics_with_sorting():
     assert res_csv.status_code == 200
     assert "text/csv" in res_csv.headers["content-type"]
     assert "controversy_score" in res_csv.text
+
+def test_sources_opml_export_and_import():
+    import uuid
+    # 1. Test OPML export
+    res_export = client.get("/api/sources/opml")
+    assert res_export.status_code == 200
+    assert "application/xml" in res_export.headers["content-type"]
+    assert "<opml version=\"2.0\">" in res_export.text
+    assert "<outline" in res_export.text
+
+    # 2. Test OPML import with distinct URLs
+    uid = uuid.uuid4().hex[:8]
+    url1 = f"https://example.com/tech-radar-{uid}.xml"
+    url2 = f"https://example.com/ai-pulse-{uid}.xml"
+
+    sample_opml = f"""<?xml version="1.0" encoding="UTF-8"?>
+    <opml version="2.0">
+      <head>
+        <title>Test OPML Subscriptions</title>
+      </head>
+      <body>
+        <outline text="Tech Feeds" title="Tech Feeds">
+          <outline text="Test Tech Radar" title="Test Tech Radar" type="rss" xmlUrl="{url1}" htmlUrl="https://example.com" />
+          <outline text="Test AI Pulse" title="Test AI Pulse" type="rss" xmlUrl="{url2}" htmlUrl="https://example.com" />
+        </outline>
+      </body>
+    </opml>"""
+
+    res_import = client.post(
+        "/api/sources/opml",
+        headers={"Content-Type": "application/xml"},
+        content=sample_opml
+    )
+    assert res_import.status_code == 200
+    data = res_import.json()
+    assert data["total_found"] == 2
+    assert data["imported_count"] == 2
+    assert data["existing_count"] == 0
+
+    # 3. Test re-importing same feeds (should mark existing)
+    res_reimport = client.post(
+        "/api/sources/opml",
+        headers={"Content-Type": "application/xml"},
+        content=sample_opml
+    )
+    assert res_reimport.status_code == 200
+    re_data = res_reimport.json()
+    assert re_data["total_found"] == 2
+    assert re_data["existing_count"] == 2
+    assert re_data["imported_count"] == 0

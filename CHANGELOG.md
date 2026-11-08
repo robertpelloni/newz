@@ -2,6 +2,13 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.8.8] - 2026-11-08
+### Added
+- Standardized OPML 2.0 subscription export endpoint (`GET /api/sources/opml`) in `backend/main.py` formatting all active feed subscriptions into compliant XML outline trees.
+- Bulk OPML subscription import endpoint (`POST /api/sources/opml`) in `backend/main.py` parsing XML/JSON outlines with deduplication and transactional insertion.
+- Frontend OPML Export and Import controls in `frontend/src/app/page.tsx` within the Feed Subscriptions & Sources modal with toast notifications.
+- Automated unit and integration test `test_sources_opml_export_and_import` in `backend/tests/test_api.py` (25/25 tests passing).
+
 ## [0.8.7] - 2026-11-08
 ### Added
 - Multi-criteria priority sorting for intelligence export reports (`GET /api/topics/export?sort_by=...`), exporting clusters strictly ordered by coverage density, controversy, sentiment polarity, or recency.

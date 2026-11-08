@@ -59,3 +59,4 @@
 - [x] Topic narrative entity relationship matrix and interactive citation filtering (v0.8.5).
 - [x] Category-scoped sentiment pulse telemetry and dynamic domain filtering (v0.8.6).
 - [x] Multi-criteria topic export sorting and polarity score inclusion (v0.8.7).
+- [x] OPML 2.0 feed subscription export and bulk outline import pipeline (v0.8.8).
