@@ -2,6 +2,18 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.9.0] - 2026-11-08
+### Added
+- **Custom Bookmark Annotation Notes & Categorization Tags**:
+  - Upgraded IndexedDB offline database schema to `DB_VERSION = 3` with dedicated `bookmark_notes` object store in `frontend/src/utils/offlineStore.ts`.
+  - Added persistent client-side storage helpers `saveBookmarkAnnotationToIndexedDB`, `getBookmarkAnnotationsFromIndexedDB`, and `deleteBookmarkAnnotationFromIndexedDB`.
+  - Integrated interactive bookmark annotation and tag editor within the topic cluster deep-dive modal in `frontend/src/app/page.tsx` (`📝 Edit Note / Tags`, rich note textarea, tag chips editor, and save handler).
+  - Rendered inline notes and tag badges on bookmarked cards in the main feed view.
+  - Added dynamic bookmark tag filter pills (`#tag`) in the header filtering bar when viewing saved bookmarks.
+  - Enriched universal Reading List export in both JSON and Markdown formats (`handleExportBookmarks`) to include custom user notes and associated tag taxonomies.
+  - Fully preserved bookmark annotations in offline vault JSON archives (`exportOfflineVault` and `importOfflineVault`).
+  - Extended Playwright automated test suite in `scripts/test_offline_data_access.py` validating IndexedDB v3 `bookmark_notes` persistence.
+
 ## [0.8.9] - 2026-11-08
 ### Added
 - **IndexedDB Feed Vault & Disconnected Source Resilience**:

@@ -96,6 +96,32 @@ def test_offline_caching_and_sync():
         print(f"       IndexedDB feed sources count: {len(saved_sources)}")
         assert isinstance(saved_sources, list) and len(saved_sources) > 0, "Expected feed sources to persist in IndexedDB"
 
+        # Test bookmark annotation note & tags persistence in bookmark_notes store
+        annotation_res = page.evaluate("""
+            async () => {
+                return new Promise((resolve) => {
+                    const req = indexedDB.open('omnifeed_offline_db');
+                    req.onsuccess = () => {
+                        const db = req.result;
+                        if (!db.objectStoreNames.contains('bookmark_notes')) return resolve(false);
+                        const tx = db.transaction('bookmark_notes', 'readwrite');
+                        const store = tx.objectStore('bookmark_notes');
+                        store.put({
+                            topic_id: 184,
+                            note: "Automated offline research annotation test",
+                            tags: ["investigate", "verified"],
+                            updated_at: new Date().toISOString()
+                        });
+                        tx.oncomplete = () => resolve(true);
+                        tx.onerror = () => resolve(false);
+                    };
+                    req.onerror = () => resolve(false);
+                });
+            }
+        """)
+        assert annotation_res is True, "Expected bookmark annotation to save into IndexedDB bookmark_notes store"
+        print("       Bookmark annotation store persistence successfully verified.")
+
         # Step 3: Test pre-cache all deep-dives button
         print("[4/9] Testing pre-cache all deep-dives in offline modal...")
         cache_btn = page.locator("button:has-text('💾 Cache')")

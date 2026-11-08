@@ -1,10 +1,18 @@
 // Client-side IndexedDB persistence layer for Omnifeed offline intelligence
 const DB_NAME = 'omnifeed_offline_db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const TOPICS_STORE = 'topics_store';
 const DETAILS_STORE = 'details_store';
 const METRICS_STORE = 'metrics_store';
 const SOURCES_STORE = 'sources_store';
+const BOOKMARK_NOTES_STORE = 'bookmark_notes';
+
+export interface BookmarkAnnotation {
+  topic_id: number;
+  note: string;
+  tags: string[];
+  updated_at: string;
+}
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -27,6 +35,9 @@ function openDatabase(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(SOURCES_STORE)) {
         db.createObjectStore(SOURCES_STORE, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(BOOKMARK_NOTES_STORE)) {
+        db.createObjectStore(BOOKMARK_NOTES_STORE, { keyPath: 'topic_id' });
       }
     };
 
@@ -171,14 +182,69 @@ export async function getSourcesFromIndexedDB(): Promise<any[]> {
   }
 }
 
+export async function saveBookmarkAnnotationToIndexedDB(annotation: BookmarkAnnotation): Promise<void> {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction(BOOKMARK_NOTES_STORE, 'readwrite');
+    const store = tx.objectStore(BOOKMARK_NOTES_STORE);
+    store.put(annotation);
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('IndexedDB saveBookmarkAnnotation error:', err);
+  }
+}
+
+export async function getBookmarkAnnotationsFromIndexedDB(): Promise<Record<number, BookmarkAnnotation>> {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction(BOOKMARK_NOTES_STORE, 'readonly');
+    const store = tx.objectStore(BOOKMARK_NOTES_STORE);
+    const request = store.getAll();
+    return new Promise((resolve) => {
+      request.onsuccess = () => {
+        const map: Record<number, BookmarkAnnotation> = {};
+        for (const item of request.result || []) {
+          if (item && item.topic_id) {
+            map[item.topic_id] = item;
+          }
+        }
+        resolve(map);
+      };
+      request.onerror = () => resolve({});
+    });
+  } catch (err) {
+    console.warn('IndexedDB getBookmarkAnnotations error:', err);
+    return {};
+  }
+}
+
+export async function deleteBookmarkAnnotationFromIndexedDB(topicId: number): Promise<void> {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction(BOOKMARK_NOTES_STORE, 'readwrite');
+    const store = tx.objectStore(BOOKMARK_NOTES_STORE);
+    store.delete(topicId);
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('IndexedDB deleteBookmarkAnnotation error:', err);
+  }
+}
+
 export async function clearOfflineIndexedDB(): Promise<void> {
   try {
     const db = await openDatabase();
-    const tx = db.transaction([TOPICS_STORE, DETAILS_STORE, METRICS_STORE, SOURCES_STORE], 'readwrite');
+    const tx = db.transaction([TOPICS_STORE, DETAILS_STORE, METRICS_STORE, SOURCES_STORE, BOOKMARK_NOTES_STORE], 'readwrite');
     tx.objectStore(TOPICS_STORE).clear();
     tx.objectStore(DETAILS_STORE).clear();
     tx.objectStore(METRICS_STORE).clear();
     tx.objectStore(SOURCES_STORE).clear();
+    tx.objectStore(BOOKMARK_NOTES_STORE).clear();
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
@@ -188,19 +254,21 @@ export async function clearOfflineIndexedDB(): Promise<void> {
   }
 }
 
-export async function importOfflineVault(vaultData: { topics?: any[]; details?: any[]; bookmarks?: number[]; sources?: any[] }): Promise<{ topicsImported: number; detailsImported: number; bookmarksImported: number; sourcesImported: number }> {
+export async function importOfflineVault(vaultData: { topics?: any[]; details?: any[]; bookmarks?: number[]; sources?: any[]; annotations?: BookmarkAnnotation[] }): Promise<{ topicsImported: number; detailsImported: number; bookmarksImported: number; sourcesImported: number; annotationsImported: number }> {
   try {
     const db = await openDatabase();
-    const tx = db.transaction([TOPICS_STORE, DETAILS_STORE, METRICS_STORE, SOURCES_STORE], 'readwrite');
+    const tx = db.transaction([TOPICS_STORE, DETAILS_STORE, METRICS_STORE, SOURCES_STORE, BOOKMARK_NOTES_STORE], 'readwrite');
     const topicsStore = tx.objectStore(TOPICS_STORE);
     const detailsStore = tx.objectStore(DETAILS_STORE);
     const metricsStore = tx.objectStore(METRICS_STORE);
     const sourcesStore = tx.objectStore(SOURCES_STORE);
+    const notesStore = tx.objectStore(BOOKMARK_NOTES_STORE);
 
     let topicsImported = 0;
     let detailsImported = 0;
     let bookmarksImported = 0;
     let sourcesImported = 0;
+    let annotationsImported = 0;
 
     if (Array.isArray(vaultData.topics)) {
       for (const t of vaultData.topics) {
@@ -234,8 +302,17 @@ export async function importOfflineVault(vaultData: { topics?: any[]; details?: 
       }
     }
 
+    if (Array.isArray(vaultData.annotations) && vaultData.annotations.length > 0) {
+      for (const a of vaultData.annotations) {
+        if (a && a.topic_id) {
+          notesStore.put(a);
+          annotationsImported += 1;
+        }
+      }
+    }
+
     return new Promise((resolve, reject) => {
-      tx.oncomplete = () => resolve({ topicsImported, detailsImported, bookmarksImported, sourcesImported });
+      tx.oncomplete = () => resolve({ topicsImported, detailsImported, bookmarksImported, sourcesImported, annotationsImported });
       tx.onerror = () => reject(tx.error);
     });
   } catch (err) {
@@ -244,15 +321,16 @@ export async function importOfflineVault(vaultData: { topics?: any[]; details?: 
   }
 }
 
-export async function getOfflineStorageMetrics(): Promise<{ topicCount: number; detailCount: number; sourceCount: number; estimatedBytes: number }> {
+export async function getOfflineStorageMetrics(): Promise<{ topicCount: number; detailCount: number; sourceCount: number; annotationCount: number; estimatedBytes: number }> {
   try {
     const db = await openDatabase();
-    const tx = db.transaction([TOPICS_STORE, DETAILS_STORE, SOURCES_STORE], 'readonly');
+    const tx = db.transaction([TOPICS_STORE, DETAILS_STORE, SOURCES_STORE, BOOKMARK_NOTES_STORE], 'readonly');
     const topicsStore = tx.objectStore(TOPICS_STORE);
     const detailsStore = tx.objectStore(DETAILS_STORE);
     const sourcesStore = tx.objectStore(SOURCES_STORE);
+    const notesStore = tx.objectStore(BOOKMARK_NOTES_STORE);
 
-    const [topics, details, sources] = await Promise.all([
+    const [topics, details, sources, notes] = await Promise.all([
       new Promise<any[]>((resolve) => {
         const req = topicsStore.getAll();
         req.onsuccess = () => resolve(req.result || []);
@@ -267,17 +345,23 @@ export async function getOfflineStorageMetrics(): Promise<{ topicCount: number; 
         const req = sourcesStore.getAll();
         req.onsuccess = () => resolve(req.result || []);
         req.onerror = () => resolve([]);
+      }),
+      new Promise<any[]>((resolve) => {
+        const req = notesStore.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
       })
     ]);
 
-    const str = JSON.stringify(topics) + JSON.stringify(details) + JSON.stringify(sources);
+    const str = JSON.stringify(topics) + JSON.stringify(details) + JSON.stringify(sources) + JSON.stringify(notes);
     return {
       topicCount: topics.length,
       detailCount: details.length,
       sourceCount: sources.length,
+      annotationCount: notes.length,
       estimatedBytes: new Blob([str]).size
     };
   } catch (err) {
-    return { topicCount: 0, detailCount: 0, sourceCount: 0, estimatedBytes: 0 };
+    return { topicCount: 0, detailCount: 0, sourceCount: 0, annotationCount: 0, estimatedBytes: 0 };
   }
 }

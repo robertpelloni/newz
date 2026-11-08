@@ -57,5 +57,6 @@
 - [x] Sorted Intelligence Reports Export & Polarity Scoring Metrics (v0.8.7).
 - [x] OPML 2.0 Feed Subscription Export & Bulk Import Engine (v0.8.8).
 - [x] IndexedDB Feed Vault & Disconnected Source Resilience (v0.8.9).
+- [x] Custom Bookmark Annotation Notes & Categorization Tags (v0.9.0).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

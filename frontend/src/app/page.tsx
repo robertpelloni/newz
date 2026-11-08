@@ -8,11 +8,15 @@ import {
   getTopicDetailFromIndexedDB,
   saveSourcesToIndexedDB,
   getSourcesFromIndexedDB,
+  saveBookmarkAnnotationToIndexedDB,
+  getBookmarkAnnotationsFromIndexedDB,
+  deleteBookmarkAnnotationFromIndexedDB,
   clearOfflineIndexedDB,
   getOfflineStorageMetrics,
   importOfflineVault,
   saveBookmarksToIndexedDB,
   getBookmarksFromIndexedDB,
+  BookmarkAnnotation,
 } from "../utils/offlineStore";
 
 interface Topic {
@@ -147,6 +151,13 @@ export default function Dashboard() {
     estimatedBytes: 0,
   });
 
+  // Bookmark Annotation & Tag State
+  const [bookmarkAnnotations, setBookmarkAnnotations] = useState<Record<number, BookmarkAnnotation>>({});
+  const [activeBookmarkTagFilter, setActiveBookmarkTagFilter] = useState<string | null>(null);
+  const [editingAnnotationTopicId, setEditingAnnotationTopicId] = useState<number | null>(null);
+  const [annotationNoteInput, setAnnotationNoteInput] = useState<string>("");
+  const [annotationTagsInput, setAnnotationTagsInput] = useState<string>("");
+
   const categories = ["All", "General", "Technology", "Business", "Politics", "Science", "Entertainment"];
 
   const playChime = () => {
@@ -249,9 +260,29 @@ export default function Dashboard() {
             }
           }).catch(() => {});
         }
+
+        // Load bookmark annotations
+        const savedNotes = localStorage.getItem("omnifeed_bookmark_annotations");
+        if (savedNotes) {
+          try {
+            setBookmarkAnnotations(JSON.parse(savedNotes));
+          } catch (_) {}
+        } else {
+          getBookmarkAnnotationsFromIndexedDB().then((notes) => {
+            if (notes && Object.keys(notes).length > 0) {
+              setBookmarkAnnotations(notes);
+              try {
+                localStorage.setItem("omnifeed_bookmark_annotations", JSON.stringify(notes));
+              } catch (_) {}
+            }
+          }).catch(() => {});
+        }
       } catch (_) {
         getBookmarksFromIndexedDB().then((ids) => {
           if (ids && ids.length > 0) setBookmarkedIds(ids);
+        }).catch(() => {});
+        getBookmarkAnnotationsFromIndexedDB().then((notes) => {
+          if (notes) setBookmarkAnnotations(notes);
         }).catch(() => {});
       }
 
@@ -283,13 +314,49 @@ export default function Dashboard() {
   const toggleBookmark = (id: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setBookmarkedIds((prev) => {
-      const updated = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
+      const isRemoving = prev.includes(id);
+      const updated = isRemoving ? prev.filter((item) => item !== id) : [...prev, id];
       try {
         localStorage.setItem("omnifeed_bookmarks", JSON.stringify(updated));
         saveBookmarksToIndexedDB(updated).catch(() => {});
+        if (isRemoving) {
+          deleteBookmarkAnnotationFromIndexedDB(id).catch(() => {});
+          setBookmarkAnnotations((notes) => {
+            const copy = { ...notes };
+            delete copy[id];
+            try {
+              localStorage.setItem("omnifeed_bookmark_annotations", JSON.stringify(copy));
+            } catch (_) {}
+            return copy;
+          });
+        }
       } catch (_) {}
       return updated;
     });
+  };
+
+  const handleSaveAnnotation = async (topicId: number) => {
+    const rawTags = annotationTagsInput
+      .split(/[,\s]+/)
+      .map((t) => t.trim().replace(/^#/, ""))
+      .filter((t) => t.length > 0);
+    const annotation: BookmarkAnnotation = {
+      topic_id: topicId,
+      note: annotationNoteInput.trim(),
+      tags: Array.from(new Set(rawTags)),
+      updated_at: new Date().toISOString(),
+    };
+    const updated = { ...bookmarkAnnotations, [topicId]: annotation };
+    setBookmarkAnnotations(updated);
+    try {
+      localStorage.setItem("omnifeed_bookmark_annotations", JSON.stringify(updated));
+      await saveBookmarkAnnotationToIndexedDB(annotation);
+    } catch (_) {}
+    setEditingAnnotationTopicId(null);
+    setAnnotationNoteInput("");
+    setAnnotationTagsInput("");
+    setLiveAlert("Bookmark annotation saved successfully.");
+    setTimeout(() => setLiveAlert(null), 3000);
   };
 
   // Fetch initial telemetry and pulse + resilient live WebSocket connection with exponential backoff
@@ -880,7 +947,11 @@ export default function Dashboard() {
     }
 
     if (format === "json") {
-      const blob = new Blob([JSON.stringify(saved, null, 2)], { type: "application/json" });
+      const enriched = saved.map((t) => ({
+        ...t,
+        annotation: bookmarkAnnotations[t.id] || null,
+      }));
+      const blob = new Blob([JSON.stringify(enriched, null, 2)], { type: "application/json" });
       const dlUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = dlUrl;
@@ -890,11 +961,18 @@ export default function Dashboard() {
     } else {
       let md = `# Omnifeed Intelligence Reading List\n\n*Generated on: ${new Date().toUTCString()}*\n\n`;
       saved.forEach((t, i) => {
+        const anno = bookmarkAnnotations[t.id];
         md += `### ${i + 1}. [${t.category?.toUpperCase() || "GENERAL"}] ${t.title}\n\n`;
         md += `> ${t.summary}\n\n`;
         md += `- **Articles correlated**: ${t.article_count}\n`;
-        md += `- **Last updated**: ${t.last_updated || "N/A"}\n\n`;
-        md += `---\n\n`;
+        md += `- **Last updated**: ${t.last_updated || "N/A"}\n`;
+        if (anno && anno.note) {
+          md += `- **Note**: ${anno.note}\n`;
+        }
+        if (anno && anno.tags && anno.tags.length > 0) {
+          md += `- **Tags**: ${anno.tags.map((tg) => `#${tg}`).join(" ")}\n`;
+        }
+        md += `\n---\n\n`;
       });
       const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
       const dlUrl = URL.createObjectURL(blob);
@@ -1214,6 +1292,7 @@ export default function Dashboard() {
             <button
               onClick={() => {
                 setShowOnlyBookmarks(!showOnlyBookmarks);
+                if (showOnlyBookmarks) setActiveBookmarkTagFilter(null);
               }}
               title="Filter to bookmarked topics stored in local client memory"
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap flex items-center space-x-1 border ${
@@ -1243,6 +1322,46 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
+
+          {/* Bookmark Tags Bar when Bookmarks active */}
+          {showOnlyBookmarks && (
+            <div className="flex items-center space-x-1.5 overflow-x-auto py-1 px-1 bg-amber-950/20 border border-amber-900/30 rounded-lg text-xs">
+              <span className="text-[10px] font-bold uppercase text-amber-400 tracking-wider pl-1">
+                Filter Tags:
+              </span>
+              <button
+                type="button"
+                onClick={() => setActiveBookmarkTagFilter(null)}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium transition ${
+                  activeBookmarkTagFilter === null
+                    ? "bg-amber-500 text-slate-950 font-bold"
+                    : "text-amber-300 hover:bg-amber-950/40"
+                }`}
+              >
+                All Tags
+              </button>
+              {Array.from(
+                new Set(
+                  Object.values(bookmarkAnnotations).flatMap((a) => a.tags || [])
+                )
+              ).map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() =>
+                    setActiveBookmarkTagFilter(activeBookmarkTagFilter === tag ? null : tag)
+                  }
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition flex items-center space-x-1 ${
+                    activeBookmarkTagFilter === tag
+                      ? "bg-amber-500 text-slate-950 font-bold"
+                      : "text-amber-300 bg-amber-950/40 hover:bg-amber-900/60 border border-amber-800/50"
+                  }`}
+                >
+                  <span>#{tag}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Dynamic Clustered Topics Grid */}
@@ -1284,18 +1403,34 @@ export default function Dashboard() {
               Loading clustered intelligence feeds...
             </div>
           ) : (showOnlyBookmarks
-                ? topics.filter((t) => bookmarkedIds.includes(t.id) && (activeCategory === "All" || (t.category || "").toLowerCase() === activeCategory.toLowerCase()))
+                ? topics.filter((t) => {
+                    if (!bookmarkedIds.includes(t.id)) return false;
+                    if (activeCategory !== "All" && (t.category || "").toLowerCase() !== activeCategory.toLowerCase()) return false;
+                    if (activeBookmarkTagFilter) {
+                      const tags = bookmarkAnnotations[t.id]?.tags || [];
+                      if (!tags.includes(activeBookmarkTagFilter)) return false;
+                    }
+                    return true;
+                  })
                 : topics
               ).length === 0 ? (
             <div className="text-center py-12 border border-dashed border-slate-800 rounded-xl text-slate-500 text-sm">
               {showOnlyBookmarks
-                ? `No bookmarked topics found in ${activeCategory}. Bookmark topics to read offline anytime!`
+                ? `No bookmarked topics found matching current filters (${activeCategory}${activeBookmarkTagFilter ? `, #${activeBookmarkTagFilter}` : ""}). Bookmark topics to read offline anytime!`
                 : "No matching topic clusters found. Try hitting ⚡ Sync Ingestion."}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {(showOnlyBookmarks
-                ? topics.filter((t) => bookmarkedIds.includes(t.id) && (activeCategory === "All" || (t.category || "").toLowerCase() === activeCategory.toLowerCase()))
+                ? topics.filter((t) => {
+                    if (!bookmarkedIds.includes(t.id)) return false;
+                    if (activeCategory !== "All" && (t.category || "").toLowerCase() !== activeCategory.toLowerCase()) return false;
+                    if (activeBookmarkTagFilter) {
+                      const tags = bookmarkAnnotations[t.id]?.tags || [];
+                      if (!tags.includes(activeBookmarkTagFilter)) return false;
+                    }
+                    return true;
+                  })
                 : topics
               ).map((t) => {
                 const isBookmarked = bookmarkedIds.includes(t.id);
@@ -1354,6 +1489,29 @@ export default function Dashboard() {
                       <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed">
                         {t.summary}
                       </p>
+
+                      {/* Bookmark Annotation Note & Tags badge */}
+                      {isBookmarked && bookmarkAnnotations[t.id] && (
+                        <div className="pt-1.5 space-y-1">
+                          {bookmarkAnnotations[t.id].note && (
+                            <p className="text-[11px] text-amber-200/90 italic bg-amber-950/40 px-2 py-1 rounded border border-amber-900/40 line-clamp-2">
+                              📝 {bookmarkAnnotations[t.id].note}
+                            </p>
+                          )}
+                          {bookmarkAnnotations[t.id].tags && bookmarkAnnotations[t.id].tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {bookmarkAnnotations[t.id].tags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="text-[9px] font-semibold text-amber-300 bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-800/40"
+                                >
+                                  #{tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
@@ -1411,7 +1569,7 @@ export default function Dashboard() {
             {topicDetail ? (
               <>
                 <div className="space-y-2 pr-10">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 flex-wrap gap-1">
                     <span className="text-xs font-bold uppercase px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800">
                       {topicDetail.topic.category}
                     </span>
@@ -1425,7 +1583,81 @@ export default function Dashboard() {
                     >
                       <span>{bookmarkedIds.includes(topicDetail.topic.id) ? "★ Bookmarked" : "☆ Bookmark Topic"}</span>
                     </button>
+                    {bookmarkedIds.includes(topicDetail.topic.id) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = bookmarkAnnotations[topicDetail.topic.id];
+                          setEditingAnnotationTopicId(
+                            editingAnnotationTopicId === topicDetail.topic.id ? null : topicDetail.topic.id
+                          );
+                          setAnnotationNoteInput(current?.note || "");
+                          setAnnotationTagsInput((current?.tags || []).join(", "));
+                        }}
+                        className="text-xs px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-800/60 transition"
+                      >
+                        📝 {bookmarkAnnotations[topicDetail.topic.id] ? "Edit Note / Tags" : "Add Note / Tags"}
+                      </button>
+                    )}
                   </div>
+
+                  {/* Bookmark Annotation Editor */}
+                  {bookmarkedIds.includes(topicDetail.topic.id) && (
+                    editingAnnotationTopicId === topicDetail.topic.id ? (
+                      <div className="bg-amber-950/20 border border-amber-800/40 rounded-lg p-3 space-y-2 mt-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                          Edit Bookmark Annotation
+                        </span>
+                        <textarea
+                          placeholder="Private notes, insights, follow-up items..."
+                          value={annotationNoteInput}
+                          onChange={(e) => setAnnotationNoteInput(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                          rows={2}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tags separated by commas (e.g. urgent, market-shift, tech-radar)"
+                          value={annotationTagsInput}
+                          onChange={(e) => setAnnotationTagsInput(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                        />
+                        <div className="flex justify-end space-x-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setEditingAnnotationTopicId(null)}
+                            className="px-2 py-1 text-[11px] text-slate-400 hover:text-white transition"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveAnnotation(topicDetail.topic.id)}
+                            className="px-2.5 py-1 text-[11px] font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 rounded transition"
+                          >
+                            Save Annotation
+                          </button>
+                        </div>
+                      </div>
+                    ) : bookmarkAnnotations[topicDetail.topic.id] && (
+                      <div className="bg-amber-950/15 border border-amber-900/30 rounded-lg p-2.5 space-y-1 mt-2">
+                        {bookmarkAnnotations[topicDetail.topic.id].note && (
+                          <p className="text-xs text-amber-200 leading-relaxed italic">
+                            📝 {bookmarkAnnotations[topicDetail.topic.id].note}
+                          </p>
+                        )}
+                        {bookmarkAnnotations[topicDetail.topic.id].tags && bookmarkAnnotations[topicDetail.topic.id].tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {bookmarkAnnotations[topicDetail.topic.id].tags.map((tg) => (
+                              <span key={tg} className="text-[10px] font-semibold text-amber-300 bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-800/40">
+                                #{tg}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  )}
                   <h2 className="text-lg font-bold text-slate-100">
                     {topicDetail.topic.title}
                   </h2>
@@ -1683,8 +1915,10 @@ export default function Dashboard() {
                     const idbTopics = await getTopicsFromIndexedDB();
                     const idbBookmarks = await getBookmarksFromIndexedDB();
                     const idbSources = await getSourcesFromIndexedDB();
+                    const idbNotes = await getBookmarkAnnotationsFromIndexedDB();
                     const bookmarksToSave = idbBookmarks.length > 0 ? idbBookmarks : bookmarkedIds;
                     const sourcesToSave = idbSources.length > 0 ? idbSources : feedSources;
+                    const notesList = Object.values(idbNotes).length > 0 ? Object.values(idbNotes) : Object.values(bookmarkAnnotations);
                     const blob = new Blob(
                       [
                         JSON.stringify(
@@ -1693,6 +1927,7 @@ export default function Dashboard() {
                             topics: idbTopics,
                             bookmarks: bookmarksToSave,
                             sources: sourcesToSave,
+                            annotations: notesList,
                           },
                           null,
                           2
@@ -1775,9 +2010,20 @@ export default function Dashboard() {
                           setFeedSources(parsed.sources);
                           localStorage.setItem("omnifeed_sources_cache", JSON.stringify(parsed.sources));
                         }
+                        if (Array.isArray(parsed.annotations) && parsed.annotations.length > 0) {
+                          const noteMap: Record<number, BookmarkAnnotation> = {};
+                          for (const a of parsed.annotations) {
+                            if (a && a.topic_id) noteMap[a.topic_id] = a;
+                          }
+                          setBookmarkAnnotations((prev) => {
+                            const merged = { ...prev, ...noteMap };
+                            localStorage.setItem("omnifeed_bookmark_annotations", JSON.stringify(merged));
+                            return merged;
+                          });
+                        }
                         const metrics = await getOfflineStorageMetrics();
                         setOfflineMetrics(metrics);
-                        setLiveAlert(`Vault imported: ${result.topicsImported} topics, ${result.sourcesImported || 0} feeds, and ${result.bookmarksImported || 0} bookmarks restored.`);
+                        setLiveAlert(`Vault imported: ${result.topicsImported} topics, ${result.sourcesImported || 0} feeds, ${result.annotationsImported || 0} notes, and ${result.bookmarksImported || 0} bookmarks restored.`);
                         setTimeout(() => setLiveAlert(null), 3000);
                       } catch (err) {
                         alert("Failed to import vault file. Ensure it is a valid JSON vault.");
