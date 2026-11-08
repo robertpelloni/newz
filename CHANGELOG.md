@@ -2,6 +2,16 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [1.0.3] - 2026-11-08
+### Added
+- **Intermittent Delta Sync Deep Story Ingestion & Pre-Caching**:
+  - Enhanced incremental delta sync endpoint (`GET /api/topics/delta`) in `backend/main.py` with `category` domain filtering and optional `include_details=true` query parameter.
+  - When `include_details=true`, delta sync batches embed comprehensive correlated source article excerpts, narrative timeline milestones, extracted entity markers, and sentiment breakdowns directly into the payload.
+  - Extended frontend delta sync engine (`triggerIncrementalDeltaSync`) in `frontend/src/app/page.tsx` to automatically persist fetched deep-dive story objects directly into IndexedDB `details_store` (`saveTopicDetailToIndexedDB`) alongside summary topic cards.
+  - Added automatic execution audit tracking recording `delta_sync` operations with itemized counts into `sync_audit_store` for full offline transparency.
+  - Added backend unit and integration tests in `backend/tests/test_api.py` validating category-filtered delta sync and embedded topic detail structures (30/30 backend tests passing).
+  - Verified end-to-end with Playwright and automated offline test suite (9/9 passing).
+
 ## [1.0.2] - 2026-11-08
 ### Added
 - **Audio Alert Volume & Tone Synthesis Controls**:

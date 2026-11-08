@@ -414,6 +414,22 @@ def test_topics_incremental_delta_sync():
     assert res_invalid.status_code == 400
     assert "Invalid ISO timestamp format" in res_invalid.json()["detail"]
 
+    # 5. Delta sync with include_details=true embeds full detail payload
+    res_details = client.get("/api/topics/delta?limit=5&include_details=true")
+    assert res_details.status_code == 200
+    data_details = res_details.json()
+    if data_details["topics_count"] > 0:
+        first_topic = data_details["topics"][0]
+        assert "detail" in first_topic
+        assert "articles" in first_topic["detail"]
+        assert "timeline" in first_topic["detail"]
+
+    # 6. Delta sync with category filter
+    res_cat = client.get("/api/topics/delta?category=Technology&limit=10")
+    assert res_cat.status_code == 200
+    for t in res_cat.json()["topics"]:
+        assert t["category"].lower() == "technology"
+
 def test_sources_health_summary_endpoint():
     res = client.get("/api/sources/health-summary")
     assert res.status_code == 200

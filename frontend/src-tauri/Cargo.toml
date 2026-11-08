@@ -1,6 +1,6 @@
 [package]
 name = "omnifeed"
-version = "1.0.2"
+version = "1.0.3"
 description = "Omnifeed Desktop - Real-Time News & Sentiment Intelligence Hub"
 authors = ["Robert Pelloni", "Omnifeed Contributors"]
 edition = "2021"

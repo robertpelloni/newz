@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import Response, JSONResponse
 from sqlalchemy.orm import Session
-from typing import Optional, List, Set
+from typing import Optional, List, Set, Dict, Any
 import os
 import signal
 import sys
@@ -521,6 +521,8 @@ async def import_sources_opml(request: Request, db: Session = Depends(get_db)):
 @app.get("/api/topics/delta", response_model=schemas.TopicDeltaResponse)
 def get_topics_delta(
     since: Optional[str] = Query(None, description="ISO 8601 timestamp to retrieve topics updated strictly after"),
+    category: Optional[str] = Query(None, description="Optional category filter (e.g. Technology, Politics)"),
+    include_details: bool = Query(False, description="Whether to include full narrative timeline and article metadata for immediate offline caching"),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db)
 ):
@@ -539,12 +541,15 @@ def get_topics_delta(
     query = db.query(models.Topic)
     if since_dt:
         query = query.filter(models.Topic.last_updated > since_dt)
+    if category and category.lower() != "all":
+        query = query.filter(models.Topic.category.ilike(category))
 
     topics = query.order_by(models.Topic.last_updated.desc()).limit(limit).all()
 
     results = []
     for t in topics:
-        article_count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
+        article_topics = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).all()
+        article_count = len(article_topics)
         latest_sentiment = db.query(models.Sentiment).filter(models.Sentiment.topic_id == t.id).order_by(models.Sentiment.id.desc()).first()
         controversy_score = 0.0
         sentiment_score = 0.0
@@ -552,7 +557,7 @@ def get_topics_delta(
             controversy_score = latest_sentiment.breakdown_json.get("controversy", 0.0)
             sentiment_score = latest_sentiment.overall_score or 0.0
 
-        results.append({
+        topic_entry: Dict[str, Any] = {
             "id": t.id,
             "title": t.title,
             "summary": t.summary,
@@ -563,7 +568,41 @@ def get_topics_delta(
             "controversy_score": round(controversy_score, 2),
             "sentiment_score": round(sentiment_score, 2),
             "is_breaking": (controversy_score >= 0.4 or article_count >= 15),
-        })
+        }
+
+        if include_details:
+            # Embed correlated articles, timeline events, and entity markers
+            article_ids = [at.article_id for at in article_topics]
+            articles = db.query(models.Article).filter(models.Article.id.in_(article_ids)).all() if article_ids else []
+            articles_payload = [
+                {
+                    "id": a.id,
+                    "title": a.title,
+                    "url": a.url,
+                    "published_at": a.published_at.isoformat() if a.published_at else None,
+                    "excerpt": (a.raw_content[:250] + "...") if a.raw_content and len(a.raw_content) > 250 else (a.raw_content or ""),
+                }
+                for a in articles[:10]
+            ]
+            topic_entry["detail"] = {
+                "id": t.id,
+                "title": t.title,
+                "summary": t.summary,
+                "category": t.category,
+                "first_seen": t.first_seen.isoformat() if t.first_seen else None,
+                "last_updated": t.last_updated.isoformat() if t.last_updated else None,
+                "timeline": t.timeline_json or [],
+                "entities": t.entities_json or [],
+                "articles": articles_payload,
+                "sentiments": [
+                    {
+                        "overall_score": latest_sentiment.overall_score,
+                        "breakdown_json": latest_sentiment.breakdown_json,
+                    }
+                ] if latest_sentiment else [],
+            }
+
+        results.append(topic_entry)
 
     return {
         "server_time": datetime.now(timezone.utc),

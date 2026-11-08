@@ -469,6 +469,10 @@ export default function Dashboard() {
       const lastCheck = localStorage.getItem("omnifeed_last_delta_sync");
       const url = new URL(`${API_BASE}/api/topics/delta`);
       url.searchParams.append("limit", "25");
+      url.searchParams.append("include_details", "true");
+      if (activeCategory && activeCategory !== "All") {
+        url.searchParams.append("category", activeCategory);
+      }
       if (lastCheck) {
         url.searchParams.append("since", lastCheck);
       }
@@ -480,20 +484,49 @@ export default function Dashboard() {
           localStorage.setItem("omnifeed_last_delta_sync", delta.server_time);
         }
         if (Array.isArray(delta.topics) && delta.topics.length > 0) {
+          // Persist summary cards to IndexedDB
           await saveTopicsToIndexedDB(delta.topics);
+
+          // Deep pre-cache embedded detail payloads for instant offline availability
+          let detailsPreCached = 0;
+          for (const t of delta.topics) {
+            if (t.detail && t.id) {
+              await saveTopicDetailToIndexedDB(t.id, t.detail);
+              detailsPreCached += 1;
+            }
+          }
+
           setTopics((prev) => {
             const map = new Map<number, Topic>();
             delta.topics.forEach((t: Topic) => map.set(t.id, t));
             prev.forEach((t) => { if (!map.has(t.id)) map.set(t.id, t); });
             return Array.from(map.values()).slice(0, pageSize);
           });
-          setLiveAlert(`Delta Sync: ${delta.topics.length} new or updated topic(s) ingested.`);
-          setTimeout(() => setLiveAlert(null), 3000);
+
+          // Record delta sync event in IndexedDB sync audit history
+          await recordSyncAuditEntry({
+            action_type: "delta_sync",
+            status: "synced",
+            details: `Delta sync: ${delta.topics.length} topics updated, ${detailsPreCached} deep stories pre-cached`,
+            timestamp: new Date().toISOString(),
+          });
+
+          const metrics = await getOfflineStorageMetrics();
+          setOfflineMetrics(metrics);
+
+          setLiveAlert(`⚡ Delta Sync: ${delta.topics.length} updated, ${detailsPreCached} deep stories pre-cached offline.`);
+          setTimeout(() => setLiveAlert(null), 3500);
         }
         setLastSyncTime(new Date().toLocaleTimeString());
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Incremental delta sync skipped:", err);
+      await recordSyncAuditEntry({
+        action_type: "delta_sync",
+        status: "failed",
+        details: `Delta sync failure: ${err?.message || "Connection timeout"}`,
+        timestamp: new Date().toISOString(),
+      });
     } finally {
       setIsSyncingDelta(false);
     }
