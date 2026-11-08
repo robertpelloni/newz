@@ -2,6 +2,12 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.8.4] - 2026-11-08
+### Added
+- Bulk offline topic deep-dive pre-caching mechanism (`⬇️ Pre-Cache All Deep-Dives`) in `frontend/src/app/page.tsx`, allowing full narrative storylines, articles, and timelines to be indexed into `details_store` for zero-connectivity browsing.
+- Topic card offline cached badge indicators (`💾 Cached`), visually confirming which story clusters are available locally in the IndexedDB vault during offline operations.
+- Extended automated Playwright test suite in `scripts/test_offline_data_access.py` to validate pre-caching and offline cached badges.
+
 ## [0.8.3] - 2026-11-07
 ### Added
 - Chronological ordering and polarity filtering query parameters (`timeline_order`, `min_polarity`) for `GET /api/topics/{topic_id}` in `backend/main.py`.

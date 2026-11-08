@@ -1283,6 +1283,14 @@ export default function Dashboard() {
                               <span>Breaking</span>
                             </span>
                           )}
+                          {isOffline && (
+                            <span
+                              title="Full story cluster & articles cached in offline vault"
+                              className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-cyan-950/70 text-cyan-300 border border-cyan-800/60"
+                            >
+                              💾 Cached
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center space-x-2">
                           <button
@@ -1641,6 +1649,31 @@ export default function Dashboard() {
                   className="px-3 py-2 text-xs font-semibold bg-rose-950/40 hover:bg-rose-950/60 text-rose-300 border border-rose-800/60 rounded transition flex items-center space-x-1.5"
                 >
                   <span>🧹 Purge Offline Cache</span>
+                </button>
+
+                <button
+                  onClick={async () => {
+                    setLiveAlert("Pre-caching all topic deep-dives for offline inspection...");
+                    let cachedCount = 0;
+                    for (const t of topics) {
+                      try {
+                        const res = await fetch(`${API_BASE}/api/topics/${t.id}`);
+                        if (res.ok) {
+                          const data = await res.json();
+                          await saveTopicDetailToIndexedDB(t.id, data);
+                          cachedCount += 1;
+                        }
+                      } catch (_) {}
+                    }
+                    const m = await getOfflineStorageMetrics();
+                    setOfflineMetrics(m);
+                    setLiveAlert(`Successfully pre-cached ${cachedCount} topic deep-dives!`);
+                    setTimeout(() => setLiveAlert(null), 3500);
+                  }}
+                  title="Pre-fetch and persist deep-dive stories, narrative timelines, and correlated articles into IndexedDB"
+                  className="px-3 py-2 text-xs font-semibold bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/60 rounded transition flex items-center space-x-1.5"
+                >
+                  <span>⬇️ Pre-Cache All Deep-Dives</span>
                 </button>
 
                 <label className="px-3 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-800/80 rounded transition flex items-center space-x-1.5 cursor-pointer">

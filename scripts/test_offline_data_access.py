@@ -4,7 +4,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 def test_offline_caching_and_sync():
-    print("[1/8] Launching headless browser to test PWA, IndexedDB, offline filtering, bookmarks, and sync queue...")
+    print("[1/9] Launching headless browser to test PWA, IndexedDB, offline filtering, bookmarks, pre-caching, and sync queue...")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
@@ -14,7 +14,7 @@ def test_offline_caching_and_sync():
         page = context.new_page()
 
         # Step 1: Prime cache online
-        print("[2/8] Navigating while online to prime Service Worker, LocalStorage, and IndexedDB...")
+        print("[2/9] Navigating while online to prime Service Worker, LocalStorage, and IndexedDB...")
         page.goto("http://localhost:3000", wait_until="networkidle")
         time.sleep(2)
 
@@ -49,7 +49,7 @@ def test_offline_caching_and_sync():
         assert idb_count > 0, "Expected topics to be saved to IndexedDB topics_store"
 
         # Step 2: Toggle a bookmark and test persistence in IndexedDB
-        print("[3/8] Testing bookmark creation and multi-tier store persistence...")
+        print("[3/9] Testing bookmark creation and multi-tier store persistence...")
         bookmark_btn = page.locator("button[title*='Bookmark topic for offline reading']").first
         assert bookmark_btn.is_visible(), "Expected Bookmark button on topic card"
         bookmark_btn.click()
@@ -74,8 +74,24 @@ def test_offline_caching_and_sync():
         print(f"       IndexedDB bookmarked ids: {saved_bm}")
         assert isinstance(saved_bm, list) and len(saved_bm) > 0, "Expected bookmark to persist in IndexedDB"
 
-        # Step 3: Simulate offline mode
-        print("[4/8] Simulating offline mode (context.set_offline(True))...")
+        # Step 3: Test pre-cache all deep-dives button
+        print("[4/9] Testing pre-cache all deep-dives in offline modal...")
+        cache_btn = page.locator("button:has-text('💾 Cache')")
+        assert cache_btn.is_visible(), "Expected Cache button in header"
+        cache_btn.click()
+        time.sleep(0.5)
+
+        precache_btn = page.locator("button:has-text('⬇️ Pre-Cache All Deep-Dives')")
+        assert precache_btn.is_visible(), "Expected Pre-Cache All Deep-Dives button in modal"
+        precache_btn.click()
+        time.sleep(1.5)
+
+        # Close modal
+        page.locator("button:has-text('✕')").click()
+        time.sleep(0.5)
+
+        # Step 4: Simulate offline mode
+        print("[5/9] Simulating offline mode (context.set_offline(True))...")
         context.set_offline(True)
         page.evaluate("() => window.dispatchEvent(new Event('offline'))")
         time.sleep(1)
@@ -85,8 +101,13 @@ def test_offline_caching_and_sync():
         assert offline_banner.is_visible(), "Expected offline indicator banner to be visible"
         print("       Offline mode banner confirmed visible.")
 
-        # Step 4: Test offline search filtering over IndexedDB cached store
-        print("[5/8] Testing offline search filtering against cached vault...")
+        # Check offline Cached badge on topic card
+        cached_badge = page.locator("text=💾 Cached").first
+        assert cached_badge.is_visible(), "Expected 💾 Cached badge on topic cards while offline"
+        print("       Topic card 💾 Cached badge confirmed visible.")
+
+        # Step 5: Test offline search filtering over IndexedDB cached store
+        print("[6/9] Testing offline search filtering against cached vault...")
         search_input = page.locator("input[placeholder*='Search topics']")
         first_topic_title = topics[0].split()[0] # first word
         search_input.fill(first_topic_title)
@@ -98,8 +119,8 @@ def test_offline_caching_and_sync():
         search_input.fill("")
         time.sleep(0.5)
 
-        # Step 5: Trigger offline sync actions
-        print("[6/8] Triggering Sync while offline to verify queue accumulation...")
+        # Step 6: Trigger offline sync actions
+        print("[7/9] Triggering Sync while offline to verify queue accumulation...")
         sync_button = page.locator("button:has-text('⚡ Queue Sync')")
         assert sync_button.is_visible(), "Expected Queue Sync button to appear while offline"
         sync_button.click()
@@ -109,10 +130,8 @@ def test_offline_caching_and_sync():
         assert queue_data is not None and "sync_feeds" in queue_data, "Expected offline action to be queued in localStorage"
         print(f"       Offline sync queue confirmed in localStorage: {queue_data}")
 
-        # Step 6: Open Offline Storage Management modal and verify buttons
-        print("[7/8] Verifying Offline Storage Modal, Replay Queue button, and Import Vault...")
-        cache_btn = page.locator("button:has-text('💾 Cache')")
-        assert cache_btn.is_visible(), "Expected Cache button in header"
+        # Step 7: Open Offline Storage Management modal and verify buttons
+        print("[8/9] Verifying Offline Storage Modal, Replay Queue button, and Import Vault...")
         cache_btn.click()
         time.sleep(0.5)
 
@@ -126,8 +145,8 @@ def test_offline_caching_and_sync():
         assert import_label.is_visible(), "Expected Import Vault button in modal"
         print("       Replay Queue and Import Vault buttons confirmed visible in modal.")
 
-        # Step 7: Test programmatic vault import restoration
-        print("[8/8] Testing vault import restoration into IndexedDB store...")
+        # Step 8: Test programmatic vault import restoration
+        print("[9/9] Testing vault import restoration into IndexedDB store...")
         import_res = page.evaluate("""
             async () => {
                 const dummyVault = {
@@ -169,7 +188,7 @@ def test_offline_caching_and_sync():
         print(f"       Verification screenshot captured at {screenshot_path}")
 
         browser.close()
-        print("SUCCESS: PWA offline caching, IndexedDB vault, bookmarks, and sync queue tests passed!")
+        print("SUCCESS: PWA offline caching, IndexedDB vault, bookmarks, deep-dive pre-caching, and sync queue tests passed!")
 
 if __name__ == '__main__':
     test_offline_caching_and_sync()
