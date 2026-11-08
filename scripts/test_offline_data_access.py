@@ -182,7 +182,7 @@ def test_offline_caching_and_sync():
         idb_queue = page.evaluate("""
             async () => {
                 return new Promise((resolve) => {
-                    const req = indexedDB.open('omnifeed_offline_db', 3);
+                    const req = indexedDB.open('omnifeed_offline_db');
                     req.onsuccess = () => {
                         const db = req.result;
                         const tx = db.transaction('metrics_store', 'readonly');

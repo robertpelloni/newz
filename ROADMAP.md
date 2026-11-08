@@ -68,5 +68,6 @@
 - [x] Offline Storage Auto-Compaction & Quota Governance (v0.9.8).
 - [x] Periodic Automated Feed Health Heartbeat & Diagnostics (v0.9.9).
 - [x] Production General Availability & Category Domain Hotkeys (v1.0.0).
+- [x] Sync Audit History Logging, Conflict Drawer Inspector & Resilient Queue Reconciliation (v1.0.1).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

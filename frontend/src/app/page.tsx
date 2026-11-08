@@ -20,7 +20,13 @@ import {
   getSyncQueueFromIndexedDB,
   compactOfflineVault,
   getStorageQuotaEstimate,
+  recordSyncAuditEntry,
+  getSyncAuditHistory,
+  clearSyncAuditHistory,
+  reconcileSyncQueue,
   BookmarkAnnotation,
+  SyncAuditEntry,
+  SyncQueueAction,
 } from "../utils/offlineStore";
 
 interface Topic {
@@ -178,6 +184,8 @@ export default function Dashboard() {
     sourceCount: 0,
     estimatedBytes: 0,
   });
+  const [syncAuditLogs, setSyncAuditLogs] = useState<SyncAuditEntry[]>([]);
+  const [showSyncAuditHistory, setShowSyncAuditHistory] = useState<boolean>(false);
 
   // Bookmark Annotation & Tag State
   const [bookmarkAnnotations, setBookmarkAnnotations] = useState<Record<number, BookmarkAnnotation>>({});
@@ -247,7 +255,7 @@ export default function Dashboard() {
       const replayOfflineQueue = async () => {
         setIsOffline(false);
         try {
-          let queue: Array<any> = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+          let queue: Array<SyncQueueAction> = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
           if (queue.length === 0) {
             const idbQueue = await getSyncQueueFromIndexedDB();
             if (idbQueue.length > 0) {
@@ -256,12 +264,18 @@ export default function Dashboard() {
           }
           if (queue.length > 0) {
             setLiveAlert(`Replaying ${queue.length} offline queued actions...`);
-            const remaining: Array<any> = [];
+            const remaining: Array<SyncQueueAction> = [];
             for (const action of queue) {
               try {
                 if (action.type === "sync_feeds") {
                   const res = await fetch(`${API_BASE}/api/actions/sync`, { method: "POST" });
                   if (!res.ok) throw new Error("Sync failed");
+                  await recordSyncAuditEntry({
+                    action_type: "sync_feeds",
+                    status: "synced",
+                    details: "Ingestion pipeline triggered successfully",
+                    timestamp: new Date().toISOString(),
+                  });
                 } else if (action.type === "add_feed" && action.payload) {
                   const res = await fetch(`${API_BASE}/api/sources`, {
                     method: "POST",
@@ -269,15 +283,40 @@ export default function Dashboard() {
                     body: JSON.stringify(action.payload),
                   });
                   if (!res.ok) throw new Error("Add feed failed");
+                  await recordSyncAuditEntry({
+                    action_type: "add_feed",
+                    status: "synced",
+                    details: `Feed "${action.payload.name}" added (${action.payload.url})`,
+                    timestamp: new Date().toISOString(),
+                  });
                 } else if (action.type === "delete_feed" && action.source_id) {
                   const res = await fetch(`${API_BASE}/api/sources/${action.source_id}`, {
                     method: "DELETE",
                   });
                   if (!res.ok) throw new Error("Delete feed failed");
+                  await recordSyncAuditEntry({
+                    action_type: "delete_feed",
+                    status: "synced",
+                    details: `Source ID ${action.source_id} removed`,
+                    timestamp: new Date().toISOString(),
+                  });
                 }
-              } catch (err) {
-                // If an intermittent drop occurs during replay, retain unplayed actions
-                remaining.push(action);
+              } catch (err: any) {
+                // If an intermittent drop occurs during replay, increment retry count and retain
+                const retryCount = (action.retry_count || 0) + 1;
+                const failedAction: SyncQueueAction = {
+                  ...action,
+                  retry_count: retryCount,
+                  status: retryCount >= 5 ? "failed" : "pending",
+                  last_error: err?.message || "Network unreachable",
+                };
+                remaining.push(failedAction);
+                await recordSyncAuditEntry({
+                  action_type: action.type,
+                  status: "failed",
+                  details: `Replay error (retry #${retryCount}): ${err?.message || "Unknown error"}`,
+                  timestamp: new Date().toISOString(),
+                });
               }
             }
             if (remaining.length > 0) {
@@ -294,6 +333,8 @@ export default function Dashboard() {
             fetchSystemData();
             fetchTopics();
             setLastSyncTime(new Date().toLocaleTimeString());
+            const auditLogs = await getSyncAuditHistory(15);
+            setSyncAuditLogs(auditLogs);
             setTimeout(() => setLiveAlert(null), 3500);
           }
         } catch (e) {
@@ -1102,6 +1143,7 @@ export default function Dashboard() {
       const queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
       queue.push({ type: "sync_feeds", timestamp: new Date().toISOString() });
       localStorage.setItem("omnifeed_sync_queue", JSON.stringify(queue));
+      await saveSyncQueueToIndexedDB(queue);
       setPendingSyncCount(queue.length);
       setLiveAlert("Network failure: Ingestion sync queued for background retry.");
       setTimeout(() => setLiveAlert(null), 3000);
@@ -1386,12 +1428,14 @@ export default function Dashboard() {
           {/* Offline Cache Manager Button */}
           <button
             onClick={async () => {
-              const [metrics, quota] = await Promise.all([
+              const [metrics, quota, auditLogs] = await Promise.all([
                 getOfflineStorageMetrics(),
                 getStorageQuotaEstimate(),
+                getSyncAuditHistory(20),
               ]);
               setOfflineMetrics(metrics);
               setStorageQuota(quota);
+              setSyncAuditLogs(auditLogs);
               setShowOfflineModal(true);
             }}
             title="Manage IndexedDB and LocalStorage offline caches and backup offline intelligence archive"
@@ -2452,45 +2496,151 @@ export default function Dashboard() {
                 <span>
                   Pending Background Sync Queue: <strong className="text-slate-300">{pendingSyncCount} operations</strong>
                 </span>
-                {pendingSyncCount > 0 && (
+                <div className="flex items-center space-x-2">
                   <button
-                    onClick={async () => {
-                      try {
-                        const queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
-                        for (const action of queue) {
-                          if (action.type === "sync_feeds") {
-                            await fetch(`${API_BASE}/api/actions/sync`, { method: "POST" }).catch(() => {});
-                          } else if (action.type === "add_feed" && action.payload) {
-                            await fetch(`${API_BASE}/api/sources`, {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify(action.payload),
-                            }).catch(() => {});
-                          } else if (action.type === "delete_feed" && action.source_id) {
-                            await fetch(`${API_BASE}/api/sources/${action.source_id}`, {
-                              method: "DELETE",
-                            }).catch(() => {});
-                          }
-                        }
-                        localStorage.removeItem("omnifeed_sync_queue");
-                        await saveSyncQueueToIndexedDB([]);
-                        setPendingSyncCount(0);
-                        fetchSystemData();
-                        fetchTopics();
-                        const m = await getOfflineStorageMetrics();
-                        setOfflineMetrics(m);
-                        setLiveAlert("Sync queue replayed successfully!");
-                        setTimeout(() => setLiveAlert(null), 3000);
-                      } catch (err) {
-                        console.error("Manual replay error:", err);
-                      }
-                    }}
-                    className="px-2.5 py-1 text-[11px] font-semibold bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/60 rounded transition flex items-center space-x-1"
+                    onClick={() => setShowSyncAuditHistory((prev) => !prev)}
+                    className="px-2 py-0.5 text-[11px] text-cyan-400 hover:text-cyan-300 hover:underline"
                   >
-                    <span>⚡ Replay Queue Now</span>
+                    {showSyncAuditHistory ? "Hide Sync Audit Log ▲" : "View Sync Audit Log ▼"}
                   </button>
-                )}
+                  {pendingSyncCount > 0 && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const queue: Array<SyncQueueAction> = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+                          const remaining: Array<SyncQueueAction> = [];
+                          for (const action of queue) {
+                            try {
+                              if (action.type === "sync_feeds") {
+                                const res = await fetch(`${API_BASE}/api/actions/sync`, { method: "POST" });
+                                if (!res.ok) throw new Error("Sync failed");
+                                await recordSyncAuditEntry({
+                                  action_type: "sync_feeds",
+                                  status: "synced",
+                                  details: "Ingestion pipeline triggered manually",
+                                  timestamp: new Date().toISOString(),
+                                });
+                              } else if (action.type === "add_feed" && action.payload) {
+                                const res = await fetch(`${API_BASE}/api/sources`, {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify(action.payload),
+                                });
+                                if (!res.ok) throw new Error("Add feed failed");
+                                await recordSyncAuditEntry({
+                                  action_type: "add_feed",
+                                  status: "synced",
+                                  details: `Feed "${action.payload.name}" added`,
+                                  timestamp: new Date().toISOString(),
+                                });
+                              } else if (action.type === "delete_feed" && action.source_id) {
+                                const res = await fetch(`${API_BASE}/api/sources/${action.source_id}`, {
+                                  method: "DELETE",
+                                });
+                                if (!res.ok) throw new Error("Delete feed failed");
+                                await recordSyncAuditEntry({
+                                  action_type: "delete_feed",
+                                  status: "synced",
+                                  details: `Source ID ${action.source_id} removed`,
+                                  timestamp: new Date().toISOString(),
+                                });
+                              }
+                            } catch (err: any) {
+                              const retry = (action.retry_count || 0) + 1;
+                              remaining.push({
+                                ...action,
+                                retry_count: retry,
+                                status: retry >= 5 ? "failed" : "pending",
+                                last_error: err?.message,
+                              });
+                              await recordSyncAuditEntry({
+                                action_type: action.type,
+                                status: "failed",
+                                details: `Retry #${retry} failed: ${err?.message}`,
+                                timestamp: new Date().toISOString(),
+                              });
+                            }
+                          }
+                          if (remaining.length > 0) {
+                            localStorage.setItem("omnifeed_sync_queue", JSON.stringify(remaining));
+                            await saveSyncQueueToIndexedDB(remaining);
+                            setPendingSyncCount(remaining.length);
+                            setLiveAlert(`Partial connection: ${remaining.length} action(s) retained in queue.`);
+                          } else {
+                            localStorage.removeItem("omnifeed_sync_queue");
+                            await saveSyncQueueToIndexedDB([]);
+                            setPendingSyncCount(0);
+                            setLiveAlert("Sync queue replayed successfully!");
+                          }
+                          fetchSystemData();
+                          fetchTopics();
+                          const [m, logs] = await Promise.all([
+                            getOfflineStorageMetrics(),
+                            getSyncAuditHistory(20),
+                          ]);
+                          setOfflineMetrics(m);
+                          setSyncAuditLogs(logs);
+                          setTimeout(() => setLiveAlert(null), 3000);
+                        } catch (err) {
+                          console.error("Manual replay error:", err);
+                        }
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-semibold bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/60 rounded transition flex items-center space-x-1"
+                    >
+                      <span>⚡ Replay Queue Now</span>
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {/* Sync Audit History Drawer */}
+              {showSyncAuditHistory && (
+                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-2 mt-2 max-h-48 overflow-y-auto">
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+                    <span>Sync Audit History & Conflict Log</span>
+                    <button
+                      onClick={async () => {
+                        await clearSyncAuditHistory();
+                        setSyncAuditLogs([]);
+                      }}
+                      className="text-[10px] text-rose-400 hover:text-rose-300 hover:underline"
+                    >
+                      Clear Log
+                    </button>
+                  </div>
+                  {syncAuditLogs.length === 0 ? (
+                    <p className="text-[11px] text-slate-500 italic">No synchronization events recorded yet.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {syncAuditLogs.map((log, idx) => (
+                        <div
+                          key={log.id || idx}
+                          className="flex items-center justify-between text-[11px] bg-slate-900/80 p-2 rounded border border-slate-800"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                log.status === "synced"
+                                  ? "bg-emerald-950 text-emerald-400 border border-emerald-800/80"
+                                  : log.status === "conflict_resolved"
+                                  ? "bg-cyan-950 text-cyan-400 border border-cyan-800/80"
+                                  : "bg-rose-950 text-rose-400 border border-rose-800/80"
+                              }`}
+                            >
+                              {log.status}
+                            </span>
+                            <span className="font-mono text-slate-300 text-[10px]">{log.action_type}</span>
+                            <span className="text-slate-400 truncate max-w-[240px] sm:max-w-[320px]">{log.details}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-mono flex-shrink-0">
+                            {new Date(log.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

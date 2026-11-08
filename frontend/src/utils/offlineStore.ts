@@ -1,17 +1,37 @@
 // Client-side IndexedDB persistence layer for Omnifeed offline intelligence
 const DB_NAME = 'omnifeed_offline_db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const TOPICS_STORE = 'topics_store';
 const DETAILS_STORE = 'details_store';
 const METRICS_STORE = 'metrics_store';
 const SOURCES_STORE = 'sources_store';
 const BOOKMARK_NOTES_STORE = 'bookmark_notes';
+const SYNC_AUDIT_STORE = 'sync_audit_store';
 
 export interface BookmarkAnnotation {
   topic_id: number;
   note: string;
   tags: string[];
   updated_at: string;
+}
+
+export interface SyncAuditEntry {
+  id?: number;
+  action_type: string;
+  status: 'pending' | 'synced' | 'failed' | 'conflict_resolved';
+  details: string;
+  timestamp: string;
+}
+
+export interface SyncQueueAction {
+  id?: string;
+  type: string;
+  timestamp: string;
+  payload?: any;
+  source_id?: number;
+  retry_count?: number;
+  status?: 'pending' | 'syncing' | 'synced' | 'failed';
+  last_error?: string;
 }
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -38,6 +58,9 @@ function openDatabase(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(BOOKMARK_NOTES_STORE)) {
         db.createObjectStore(BOOKMARK_NOTES_STORE, { keyPath: 'topic_id' });
+      }
+      if (!db.objectStoreNames.contains(SYNC_AUDIT_STORE)) {
+        db.createObjectStore(SYNC_AUDIT_STORE, { keyPath: 'id', autoIncrement: true });
       }
     };
 
@@ -270,15 +293,100 @@ export async function deleteBookmarkAnnotationFromIndexedDB(topicId: number): Pr
   }
 }
 
+export async function recordSyncAuditEntry(entry: Omit<SyncAuditEntry, 'id'>): Promise<void> {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction(SYNC_AUDIT_STORE, 'readwrite');
+    const store = tx.objectStore(SYNC_AUDIT_STORE);
+    store.add({
+      ...entry,
+      timestamp: entry.timestamp || new Date().toISOString()
+    });
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('IndexedDB recordSyncAuditEntry error:', err);
+  }
+}
+
+export async function getSyncAuditHistory(limit = 50): Promise<SyncAuditEntry[]> {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction(SYNC_AUDIT_STORE, 'readonly');
+    const store = tx.objectStore(SYNC_AUDIT_STORE);
+    const request = store.getAll();
+    return new Promise((resolve) => {
+      request.onsuccess = () => {
+        const results: SyncAuditEntry[] = request.result || [];
+        // Sort newest first and limit
+        results.sort((a, b) => {
+          const tA = new Date(a.timestamp).getTime();
+          const tB = new Date(b.timestamp).getTime();
+          return tB - tA;
+        });
+        resolve(results.slice(0, limit));
+      };
+      request.onerror = () => resolve([]);
+    });
+  } catch (err) {
+    console.warn('IndexedDB getSyncAuditHistory error:', err);
+    return [];
+  }
+}
+
+export async function clearSyncAuditHistory(): Promise<void> {
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction(SYNC_AUDIT_STORE, 'readwrite');
+    tx.objectStore(SYNC_AUDIT_STORE).clear();
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('IndexedDB clearSyncAuditHistory error:', err);
+  }
+}
+
+export function reconcileSyncQueue(existingQueue: SyncQueueAction[], newActions: SyncQueueAction[]): SyncQueueAction[] {
+  const merged = [...existingQueue];
+  for (const action of newActions) {
+    // Deduplicate identical actions queued offline
+    const isDuplicate = merged.some((m) => {
+      if (m.type !== action.type) return false;
+      if (m.type === 'sync_feeds') return true;
+      if (m.type === 'delete_feed') return m.source_id === action.source_id;
+      if (m.type === 'add_feed' && m.payload && action.payload) {
+        return m.payload.url === action.payload.url;
+      }
+      return false;
+    });
+
+    if (!isDuplicate) {
+      merged.push({
+        ...action,
+        id: action.id || `action_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        status: action.status || 'pending',
+        retry_count: action.retry_count || 0,
+        timestamp: action.timestamp || new Date().toISOString()
+      });
+    }
+  }
+  return merged;
+}
+
 export async function clearOfflineIndexedDB(): Promise<void> {
   try {
     const db = await openDatabase();
-    const tx = db.transaction([TOPICS_STORE, DETAILS_STORE, METRICS_STORE, SOURCES_STORE, BOOKMARK_NOTES_STORE], 'readwrite');
+    const tx = db.transaction([TOPICS_STORE, DETAILS_STORE, METRICS_STORE, SOURCES_STORE, BOOKMARK_NOTES_STORE, SYNC_AUDIT_STORE], 'readwrite');
     tx.objectStore(TOPICS_STORE).clear();
     tx.objectStore(DETAILS_STORE).clear();
     tx.objectStore(METRICS_STORE).clear();
     tx.objectStore(SOURCES_STORE).clear();
     tx.objectStore(BOOKMARK_NOTES_STORE).clear();
+    tx.objectStore(SYNC_AUDIT_STORE).clear();
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);

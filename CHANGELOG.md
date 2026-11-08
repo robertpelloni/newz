@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [1.0.1] - 2026-11-08
+### Added
+- **Sync Audit Logging & Conflict History**:
+  - Implemented `sync_audit_store` in IndexedDB v4 (`frontend/src/utils/offlineStore.ts`) with functions `recordSyncAuditEntry`, `getSyncAuditHistory`, and `clearSyncAuditHistory` tracking background and manual synchronization replay history.
+  - Added collapsible Sync Audit History & Conflict Log drawer in the Offline Storage & Cache Manager modal displaying real-time execution status badges (`synced`, `failed`, `conflict_resolved`), itemized details, and execution timestamps.
+  - Implemented `reconcileSyncQueue` and structured action metadata (`retry_count`, `last_error`, `status`) to avoid duplicate background operations and gracefully track offline failures.
+  - Ensured offline sync queue actions in error catch blocks persist concurrently to IndexedDB `metrics_store`.
+
 ## [1.0.0] - 2026-11-08
 ### Added
 - **Production General Availability & Rapid Category Hotkeys**:
