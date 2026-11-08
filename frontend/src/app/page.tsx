@@ -138,6 +138,10 @@ export default function Dashboard() {
   // Topic Deep-Dive Timeline & Entity Options
   const [timelineOrder, setTimelineOrder] = useState<"asc" | "desc">("asc");
   const [timelinePolarityFilter, setTimelinePolarityFilter] = useState<"all" | "positive" | "negative">("all");
+
+  // Keyboard Shortcuts & Focused Card State
+  const [focusedTopicIndex, setFocusedTopicIndex] = useState<number>(-1);
+  const [showShortcutsModal, setShowShortcutsModal] = useState<boolean>(false);
   const [selectedEntityFilter, setSelectedEntityFilter] = useState<string | null>(null);
 
   // Custom Feed Management State
@@ -463,6 +467,81 @@ export default function Dashboard() {
       return updated;
     });
   };
+
+  // Global Keyboard Shortcuts Listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Do not trigger shortcuts when typing inside form fields
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        if (e.key === "Escape") {
+          target.blur();
+        }
+        return;
+      }
+
+      if (e.key === "Escape") {
+        if (selectedTopicId) setSelectedTopicId(null);
+        else if (showShortcutsModal) setShowShortcutsModal(false);
+        else if (showFeedsModal) setShowFeedsModal(false);
+        else if (showOfflineModal) setShowOfflineModal(false);
+        else if (showExportMenu) setShowExportMenu(false);
+      } else if (e.key === "?" || (e.shiftKey && e.key === "/")) {
+        e.preventDefault();
+        setShowShortcutsModal((prev) => !prev);
+      } else if (e.key === "/") {
+        e.preventDefault();
+        const searchInput = document.querySelector("input[placeholder*='Search topics']") as HTMLInputElement | null;
+        if (searchInput) searchInput.focus();
+      } else if (e.key === "j" || e.key === "ArrowRight") {
+        e.preventDefault();
+        if (topics.length > 0) {
+          setFocusedTopicIndex((prev) => {
+            const next = prev + 1;
+            if (next >= topics.length) {
+              if (page < totalPages) setPage((p) => p + 1);
+              return 0;
+            }
+            return next;
+          });
+        }
+      } else if (e.key === "k" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (topics.length > 0) {
+          setFocusedTopicIndex((prev) => {
+            const prevIndex = prev - 1;
+            if (prevIndex < 0) {
+              if (page > 1) setPage((p) => p - 1);
+              return Math.max(0, topics.length - 1);
+            }
+            return prevIndex;
+          });
+        }
+      } else if (e.key === "Enter") {
+        if (focusedTopicIndex >= 0 && focusedTopicIndex < topics.length && !selectedTopicId) {
+          e.preventDefault();
+          setSelectedTopicId(topics[focusedTopicIndex].id);
+        }
+      } else if (e.key === "b" || e.key === "B") {
+        if (selectedTopicId) {
+          e.preventDefault();
+          toggleBookmark(selectedTopicId);
+        } else if (focusedTopicIndex >= 0 && focusedTopicIndex < topics.length) {
+          e.preventDefault();
+          toggleBookmark(topics[focusedTopicIndex].id);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [topics, page, totalPages, selectedTopicId, focusedTopicIndex, showShortcutsModal, showFeedsModal, showOfflineModal, showExportMenu]);
 
   const handleSaveAnnotation = async (topicId: number) => {
     const rawTags = annotationTagsInput
@@ -1395,6 +1474,15 @@ export default function Dashboard() {
           </button>
 
           <button
+            onClick={() => setShowShortcutsModal(true)}
+            title="View keyboard shortcut controls (?)"
+            className="px-2.5 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded transition flex items-center space-x-1"
+          >
+            <span>⌨️</span>
+            <span className="hidden sm:inline">Keys</span>
+          </button>
+
+          <button
             onClick={handleShutdown}
             title="Safely terminate the backend server"
             className="px-3 py-1.5 text-xs font-semibold bg-red-950 hover:bg-red-900 text-red-300 border border-red-800 rounded transition"
@@ -1664,13 +1752,21 @@ export default function Dashboard() {
                     return true;
                   })
                 : topics
-              ).map((t) => {
+              ).map((t, idx) => {
                 const isBookmarked = bookmarkedIds.includes(t.id);
+                const isFocused = idx === focusedTopicIndex;
                 return (
                   <div
                     key={t.id}
-                    onClick={() => setSelectedTopicId(t.id)}
-                    className="bg-slate-900 border border-slate-800 hover:border-cyan-500/50 rounded-xl p-4 flex flex-col justify-between transition cursor-pointer group shadow-sm hover:shadow-cyan-950/20 relative"
+                    onClick={() => {
+                      setFocusedTopicIndex(idx);
+                      setSelectedTopicId(t.id);
+                    }}
+                    className={`bg-slate-900 border rounded-xl p-4 flex flex-col justify-between transition cursor-pointer group shadow-sm relative ${
+                      isFocused
+                        ? "border-cyan-400 ring-2 ring-cyan-500/60 shadow-cyan-950/50"
+                        : "border-slate-800 hover:border-cyan-500/50 hover:shadow-cyan-950/20"
+                    }`}
                   >
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
@@ -2577,6 +2673,57 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Reference Modal */}
+      {showShortcutsModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative space-y-4">
+            <button
+              onClick={() => setShowShortcutsModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 transition text-xs"
+            >
+              ✕ Close
+            </button>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-cyan-400 flex items-center space-x-2">
+                <span>⌨️</span>
+                <span>Keyboard Shortcuts Reference</span>
+              </h3>
+              <p className="text-xs text-slate-400">Navigate and triage intelligence feeds without touching the mouse.</p>
+            </div>
+            <div className="space-y-2 text-xs divide-y divide-slate-800/80">
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-slate-300">Next topic cluster</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-cyan-400 font-mono">j</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-slate-300">Previous topic cluster</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-cyan-400 font-mono">k</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-slate-300">Open focused cluster deep-dive</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-cyan-400 font-mono">Enter</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-slate-300">Toggle bookmark on focused / open topic</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-amber-400 font-mono">b</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-slate-300">Focus search bar</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-cyan-400 font-mono">/</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-slate-300">Close open modal or clear search focus</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-400 font-mono">Esc</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-slate-300">Toggle this help dialog</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-cyan-400 font-mono">?</kbd>
               </div>
             </div>
           </div>

@@ -2,6 +2,22 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.9.7] - 2026-11-08
+### Added
+- **Keyboard Shortcut Navigation & Accessibility Controls**:
+  - Implemented global `keydown` event listener in `frontend/src/app/page.tsx` supporting rapid triaging and keyboard-driven navigation:
+    - `j` / `ArrowRight`: Navigate forward to the next topic cluster card across pages.
+    - `k` / `ArrowLeft`: Navigate backward to the previous topic cluster card across pages.
+    - `Enter`: Open focused cluster deep-dive modal.
+    - `b`: Toggle bookmark on focused cluster card or inside active deep-dive modal.
+    - `/`: Focus search bar input field instantly.
+    - `Escape`: Close active modal or blur search input.
+    - `?`: Toggle Keyboard Shortcuts Reference modal.
+  - Added visual focus ring indicator (`ring-2 ring-cyan-500/60 shadow-lg`) highlighting the active topic cluster card during keyboard traversal.
+  - Added "⌨️ Keys" quick-access action button to dashboard header opening the Keyboard Shortcuts Reference dialog.
+  - Added accessible Keyboard Shortcuts Reference modal dialog detailing all keybindings.
+  - Automated Playwright end-to-end verification of keyboard traversal, modal triggers, bookmarking, and visual modal rendering.
+
 ## [0.9.6] - 2026-11-08
 ### Added
 - **Dual-Storage Offline Sync Queue in IndexedDB & Vault Backup Preservation**:

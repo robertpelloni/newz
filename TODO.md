@@ -68,3 +68,4 @@
 - [x] Export of filtered deep-search results with correlated article excerpts (v0.9.4).
 - [x] Batch bookmark and unbookmark controls for filtered topic clusters (v0.9.5).
 - [x] Dual-storage offline sync queue in IndexedDB and offline vault preservation (v0.9.6).
+- [x] Keyboard shortcut navigation and accessibility controls with visual focus ring and help dialog (v0.9.7).
