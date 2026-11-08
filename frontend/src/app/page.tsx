@@ -6,6 +6,8 @@ import {
   getTopicsFromIndexedDB,
   saveTopicDetailToIndexedDB,
   getTopicDetailFromIndexedDB,
+  saveSourcesToIndexedDB,
+  getSourcesFromIndexedDB,
   clearOfflineIndexedDB,
   getOfflineStorageMetrics,
   importOfflineVault,
@@ -138,9 +140,10 @@ export default function Dashboard() {
 
   // Offline Cache Management State
   const [showOfflineModal, setShowOfflineModal] = useState<boolean>(false);
-  const [offlineMetrics, setOfflineMetrics] = useState<{ topicCount: number; detailCount: number; estimatedBytes: number }>({
+  const [offlineMetrics, setOfflineMetrics] = useState<{ topicCount: number; detailCount: number; sourceCount: number; estimatedBytes: number }>({
     topicCount: 0,
     detailCount: 0,
+    sourceCount: 0,
     estimatedBytes: 0,
   });
 
@@ -438,12 +441,18 @@ export default function Dashboard() {
         const sourcesData = await resSources.json();
         setFeedSources(sourcesData);
         localStorage.setItem("omnifeed_sources_cache", JSON.stringify(sourcesData));
+        await saveSourcesToIndexedDB(sourcesData);
       }
     } catch (e) {
       console.error("Error fetching status or pulse:", e);
-      const cached = localStorage.getItem("omnifeed_sources_cache");
-      if (cached) {
-        try { setFeedSources(JSON.parse(cached)); } catch {}
+      const idbSources = await getSourcesFromIndexedDB();
+      if (idbSources && idbSources.length > 0) {
+        setFeedSources(idbSources);
+      } else {
+        const cached = localStorage.getItem("omnifeed_sources_cache");
+        if (cached) {
+          try { setFeedSources(JSON.parse(cached)); } catch {}
+        }
       }
     }
   };
@@ -470,6 +479,7 @@ export default function Dashboard() {
         const updated = [...feedSources, simulatedSource];
         setFeedSources(updated);
         localStorage.setItem("omnifeed_sources_cache", JSON.stringify(updated));
+        await saveSourcesToIndexedDB(updated);
 
         const queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
         queue.push({
@@ -505,6 +515,7 @@ export default function Dashboard() {
           const updated = [...feedSources.filter((s) => s.id !== created.id), created];
           setFeedSources(updated);
           localStorage.setItem("omnifeed_sources_cache", JSON.stringify(updated));
+          await saveSourcesToIndexedDB(updated);
           setNewFeedName("");
           setNewFeedUrl("");
         }
@@ -565,11 +576,30 @@ export default function Dashboard() {
   const handleDeleteFeed = async (id: number) => {
     if (!confirm("Are you sure you want to unsubscribe from this feed source?")) return;
     try {
-      const res = await fetch(`${API_BASE}/api/sources/${id}`, { method: "DELETE" });
-      if (res.ok) {
+      if (isOffline) {
         const updated = feedSources.filter(s => s.id !== id);
         setFeedSources(updated);
         localStorage.setItem("omnifeed_sources_cache", JSON.stringify(updated));
+        await saveSourcesToIndexedDB(updated);
+
+        const queue = JSON.parse(localStorage.getItem("omnifeed_sync_queue") || "[]");
+        queue.push({
+          type: "delete_feed",
+          timestamp: new Date().toISOString(),
+          source_id: id,
+        });
+        localStorage.setItem("omnifeed_sync_queue", JSON.stringify(queue));
+        setPendingSyncCount(queue.length);
+        setLiveAlert("Feed removal queued for sync once back online.");
+        setTimeout(() => setLiveAlert(null), 3000);
+      } else {
+        const res = await fetch(`${API_BASE}/api/sources/${id}`, { method: "DELETE" });
+        if (res.ok) {
+          const updated = feedSources.filter(s => s.id !== id);
+          setFeedSources(updated);
+          localStorage.setItem("omnifeed_sources_cache", JSON.stringify(updated));
+          await saveSourcesToIndexedDB(updated);
+        }
       }
     } catch (e) {
       console.error("Failed to delete feed:", e);
@@ -1620,7 +1650,7 @@ export default function Dashboard() {
             </div>
 
             {/* Storage telemetry metrics */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
                 <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Cached Topics</span>
                 <p className="text-xl font-bold text-cyan-300 mt-1">{offlineMetrics.topicCount}</p>
@@ -1630,6 +1660,11 @@ export default function Dashboard() {
                 <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Cached Details</span>
                 <p className="text-xl font-bold text-emerald-400 mt-1">{offlineMetrics.detailCount}</p>
                 <span className="text-[10px] text-slate-500">Deep-dive stories</span>
+              </div>
+              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Saved Feeds</span>
+                <p className="text-xl font-bold text-purple-400 mt-1">{offlineMetrics.sourceCount || 0}</p>
+                <span className="text-[10px] text-slate-500">Offline channels</span>
               </div>
               <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
                 <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Estimated Footprint</span>
@@ -1647,7 +1682,9 @@ export default function Dashboard() {
                   onClick={async () => {
                     const idbTopics = await getTopicsFromIndexedDB();
                     const idbBookmarks = await getBookmarksFromIndexedDB();
+                    const idbSources = await getSourcesFromIndexedDB();
                     const bookmarksToSave = idbBookmarks.length > 0 ? idbBookmarks : bookmarkedIds;
+                    const sourcesToSave = idbSources.length > 0 ? idbSources : feedSources;
                     const blob = new Blob(
                       [
                         JSON.stringify(
@@ -1655,6 +1692,7 @@ export default function Dashboard() {
                             exported_at: new Date().toISOString(),
                             topics: idbTopics,
                             bookmarks: bookmarksToSave,
+                            sources: sourcesToSave,
                           },
                           null,
                           2
@@ -1733,9 +1771,13 @@ export default function Dashboard() {
                           setBookmarkedIds(parsed.bookmarks);
                           localStorage.setItem("omnifeed_bookmarks", JSON.stringify(parsed.bookmarks));
                         }
+                        if (Array.isArray(parsed.sources) && parsed.sources.length > 0) {
+                          setFeedSources(parsed.sources);
+                          localStorage.setItem("omnifeed_sources_cache", JSON.stringify(parsed.sources));
+                        }
                         const metrics = await getOfflineStorageMetrics();
                         setOfflineMetrics(metrics);
-                        setLiveAlert(`Vault imported: ${result.topicsImported} topics and ${result.bookmarksImported || 0} bookmarks restored.`);
+                        setLiveAlert(`Vault imported: ${result.topicsImported} topics, ${result.sourcesImported || 0} feeds, and ${result.bookmarksImported || 0} bookmarks restored.`);
                         setTimeout(() => setLiveAlert(null), 3000);
                       } catch (err) {
                         alert("Failed to import vault file. Ensure it is a valid JSON vault.");

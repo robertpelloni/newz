@@ -32,9 +32,10 @@ def test_offline_caching_and_sync():
         idb_count = page.evaluate("""
             async () => {
                 return new Promise((resolve) => {
-                    const req = indexedDB.open('omnifeed_offline_db', 1);
+                    const req = indexedDB.open('omnifeed_offline_db');
                     req.onsuccess = () => {
                         const db = req.result;
+                        if (!db.objectStoreNames.contains('topics_store')) return resolve(0);
                         const tx = db.transaction('topics_store', 'readonly');
                         const store = tx.objectStore('topics_store');
                         const countReq = store.count();
@@ -58,7 +59,7 @@ def test_offline_caching_and_sync():
         saved_bm = page.evaluate("""
             async () => {
                 return new Promise((resolve) => {
-                    const req = indexedDB.open('omnifeed_offline_db', 1);
+                    const req = indexedDB.open('omnifeed_offline_db');
                     req.onsuccess = () => {
                         const db = req.result;
                         const tx = db.transaction('metrics_store', 'readonly');
@@ -73,6 +74,27 @@ def test_offline_caching_and_sync():
         """)
         print(f"       IndexedDB bookmarked ids: {saved_bm}")
         assert isinstance(saved_bm, list) and len(saved_bm) > 0, "Expected bookmark to persist in IndexedDB"
+
+        # Verify sources persistence in IndexedDB sources_store
+        saved_sources = page.evaluate("""
+            async () => {
+                return new Promise((resolve) => {
+                    const req = indexedDB.open('omnifeed_offline_db');
+                    req.onsuccess = () => {
+                        const db = req.result;
+                        if (!db.objectStoreNames.contains('sources_store')) return resolve([]);
+                        const tx = db.transaction('sources_store', 'readonly');
+                        const store = tx.objectStore('sources_store');
+                        const getReq = store.getAll();
+                        getReq.onsuccess = () => resolve(getReq.result || []);
+                        getReq.onerror = () => resolve([]);
+                    };
+                    req.onerror = () => resolve([]);
+                });
+            }
+        """)
+        print(f"       IndexedDB feed sources count: {len(saved_sources)}")
+        assert isinstance(saved_sources, list) and len(saved_sources) > 0, "Expected feed sources to persist in IndexedDB"
 
         # Step 3: Test pre-cache all deep-dives button
         print("[4/9] Testing pre-cache all deep-dives in offline modal...")
@@ -165,7 +187,7 @@ def test_offline_caching_and_sync():
                     bookmarks: [99999]
                 };
                 return new Promise((resolve) => {
-                    const req = indexedDB.open('omnifeed_offline_db', 1);
+                    const req = indexedDB.open('omnifeed_offline_db');
                     req.onsuccess = () => {
                         const db = req.result;
                         const tx = db.transaction(['topics_store', 'metrics_store'], 'readwrite');

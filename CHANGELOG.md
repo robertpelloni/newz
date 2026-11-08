@@ -2,6 +2,15 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.8.9] - 2026-11-08
+### Added
+- **IndexedDB Feed Vault & Disconnected Source Resilience**:
+  - Upgraded IndexedDB offline intelligence database schema to `DB_VERSION = 2` with dedicated `sources_store`.
+  - Added persistent client-side caching of all news and custom RSS/Atom feeds via `saveSourcesToIndexedDB` and `getSourcesFromIndexedDB`.
+  - Wired optimistic offline updates for feed subscription additions and deletions directly into the IndexedDB vault, ensuring channels remain accessible across browser restarts during complete network disconnections.
+  - Extended the "Offline Intelligence Storage" modal with "Saved Feeds" metric cards, updated footprint analytics, and full feed sources preservation in JSON vault exports and imports.
+  - Enhanced automated Playwright suite in `scripts/test_offline_data_access.py` to assert IndexedDB feed source persistence.
+
 ## [0.8.8] - 2026-11-08
 ### Added
 - Standardized OPML 2.0 subscription export endpoint (`GET /api/sources/opml`) in `backend/main.py` formatting all active feed subscriptions into compliant XML outline trees.

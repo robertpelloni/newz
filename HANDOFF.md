@@ -1,21 +1,22 @@
 # Omnifeed (Newz) - Session Handoff & Architecture Notes
 
-## Session Summary (v0.8.8)
-In this release iteration, we implemented standardized OPML 2.0 subscription export and bulk import:
-1. **OPML 2.0 Subscription Export & Import Protocol (`/api/sources/opml`)**:
-   - Implemented `GET /api/sources/opml` generating standardized OPML 2.0 XML specifications of all active news feeds and custom RSS/Atom channels.
-   - Implemented `POST /api/sources/opml` supporting bulk subscription imports from OPML XML documents and JSON payloads with automatic deduplication, status reporting (`created`, `existing`, `failed`), and transactional integrity.
-2. **Synchronized UI OPML Handlers**:
-   - Wired OPML import/export controls directly into the frontend "Feed Sources & Subscriptions" modal in `frontend/src/app/page.tsx` with native file picker, live toast alerts, and automatic telemetry updates.
+## Session Summary (v0.8.9)
+In this release iteration, we upgraded offline storage resilience with persistent IndexedDB feed caching:
+1. **IndexedDB Feed Vault & Disconnected Source Resilience**:
+   - Upgraded IndexedDB schema to `DB_VERSION = 2` with dedicated `sources_store` object store in `frontend/src/utils/offlineStore.ts`.
+   - Implemented `saveSourcesToIndexedDB` and `getSourcesFromIndexedDB` ensuring channels remain permanently accessible across browser restarts without active internet connectivity.
+   - Integrated optimistic updates for offline feed additions and removals directly into the IndexedDB vault alongside the sync queue.
+2. **Offline Storage Modal & Vault Export Enhancements**:
+   - Added "Saved Feeds" metric card to the Offline Intelligence Storage modal.
+   - Included feed sources in offline vault JSON export and restored feeds on vault JSON import.
 3. **Automated Testing & End-to-End Verification**:
-   - Added unit and integration test `test_sources_opml_export_and_import` in `backend/tests/test_api.py` (25/25 tests passing).
-   - Executed Playwright visual verification script (`/home/jules/verification/verify_opml.png`).
-   - Executed Playwright automated offline verification suite (`scripts/test_offline_data_access.py` 9/9 steps passing).
+   - All 25 backend pytest tests pass in `backend/tests/test_api.py`.
+   - Updated and executed Playwright offline access test suite (`scripts/test_offline_data_access.py`) validating IndexedDB feed source persistence.
    - Verified Next.js build compilation (`npm run build`).
-   - Synchronized single-source version `0.8.8` across `VERSION.md`, `frontend/src-tauri/tauri.conf.json`, `frontend/src-tauri/Cargo.toml`, `CHANGELOG.md`, `ROADMAP.md`, `TODO.md`, and `HANDOFF.md`.
+   - Synchronized single-source version `0.8.9` across `VERSION.md`, `frontend/src-tauri/tauri.conf.json`, `frontend/src-tauri/Cargo.toml`, `CHANGELOG.md`, `ROADMAP.md`, `TODO.md`, and `HANDOFF.md`.
 
 ## Active Runtime Environment:
-- **Current Version**: v0.8.8 (tracked in `VERSION.md`).
+- **Current Version**: v0.8.9 (tracked in `VERSION.md`).
 - **Git Branch**: `jules-6192871868108129425-4e3e34d4`
 - **Active Ports**:
   - FastAPI Backend: `http://localhost:8000` (PID managed, live telemetry delta streaming on `/api/ws/feed`)
