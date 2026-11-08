@@ -67,5 +67,6 @@
 - [x] Keyboard Shortcut Navigation & Accessibility Controls (v0.9.7).
 - [x] Offline Storage Auto-Compaction & Quota Governance (v0.9.8).
 - [x] Periodic Automated Feed Health Heartbeat & Diagnostics (v0.9.9).
+- [x] Production General Availability & Category Domain Hotkeys (v1.0.0).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

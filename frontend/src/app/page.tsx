@@ -545,6 +545,17 @@ export default function Dashboard() {
           e.preventDefault();
           toggleBookmark(topics[focusedTopicIndex].id);
         }
+      } else if (["1", "2", "3", "4", "5", "6", "7"].includes(e.key)) {
+        e.preventDefault();
+        const catIndex = parseInt(e.key, 10) - 1;
+        if (catIndex >= 0 && catIndex < categories.length) {
+          const chosenCategory = categories[catIndex];
+          setActiveCategory(chosenCategory);
+          setShowOnlyBookmarks(false);
+          setPage(1);
+          setLiveAlert(`Switched domain: ${chosenCategory}`);
+          setTimeout(() => setLiveAlert(null), 2500);
+        }
       }
     };
 
@@ -2818,6 +2829,10 @@ export default function Dashboard() {
               <div className="flex items-center justify-between py-1.5">
                 <span className="text-slate-300">Close open modal or clear search focus</span>
                 <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-400 font-mono">Esc</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-slate-300">Switch category domain (All → Entertainment)</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-cyan-400 font-mono">1 – 7</kbd>
               </div>
               <div className="flex items-center justify-between py-1.5">
                 <span className="text-slate-300">Toggle this help dialog</span>

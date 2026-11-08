@@ -71,3 +71,4 @@
 - [x] Keyboard shortcut navigation and accessibility controls with visual focus ring and help dialog (v0.9.7).
 - [x] Offline storage auto-compaction and quota governance with visual telemetry progress bar (v0.9.8).
 - [x] Periodic automated feed health heartbeat probe & diagnostics telemetry (v0.9.9).
+- [x] Production General Availability release v1.0.0 and numerical category domain hotkeys (v1.0.0).

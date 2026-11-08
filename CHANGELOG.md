@@ -2,6 +2,13 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [1.0.0] - 2026-11-08
+### Added
+- **Production General Availability & Rapid Category Hotkeys**:
+  - Implemented numerical keyboard hotkeys `1` through `7` in `frontend/src/app/page.tsx` allowing instant switching across intelligence domains ("All", "General", "Technology", "Business", "Politics", "Science", "Entertainment") without mouse usage.
+  - Enhanced the Keyboard Shortcuts Reference modal with domain switching guidance (`1 – 7`).
+  - Reached Production General Availability (v1.0.0) milestone with consolidated single-page dashboard, dual-tier SQLite/PostgreSQL persistence, local AI summarization, real-time WebSocket streaming, PWA offline caching, IndexedDB v3 vault, feed health heartbeat diagnostics, and full desktop Tauri v2 packaging.
+
 ## [0.9.9] - 2026-11-08
 ### Added
 - **Periodic Automated Feed Health Heartbeat & Diagnostics**:
