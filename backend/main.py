@@ -646,10 +646,11 @@ def export_topics(
     format: str = Query("json", pattern="^(json|csv)$"),
     category: Optional[str] = None,
     q: Optional[str] = None,
+    include_articles: bool = Query(False, description="Include correlated source article citations and excerpts in export"),
     sort_by: str = Query("latest", pattern="^(latest|articles|controversy|sentiment)$"),
     db: Session = Depends(get_db)
 ):
-    """Export clustered intelligence topics to CSV or JSON formats with multi-criteria sorting."""
+    """Export filtered topics to CSV or JSON formats with optional correlated article excerpts for offline intelligence briefs and reporting."""
     query = db.query(models.Topic)
     if category and category.lower() != "all":
         query = query.filter(models.Topic.category.ilike(f"%{category}%"))
@@ -667,7 +668,8 @@ def export_topics(
     topics = query.all()
     data = []
     for t in topics:
-        article_count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
+        article_links = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).all()
+        article_count = len(article_links)
         latest_sentiment = db.query(models.Sentiment).filter(models.Sentiment.topic_id == t.id).order_by(models.Sentiment.id.desc()).first()
         controversy_score = 0.0
         sentiment_score = 0.0
@@ -675,7 +677,7 @@ def export_topics(
             controversy_score = latest_sentiment.breakdown_json.get("controversy", 0.0)
             sentiment_score = latest_sentiment.overall_score or 0.0
 
-        data.append({
+        item = {
             "id": t.id,
             "title": t.title,
             "category": t.category or "General",
@@ -685,7 +687,24 @@ def export_topics(
             "sentiment_score": round(sentiment_score, 2),
             "first_seen": t.first_seen.isoformat() if t.first_seen else "",
             "last_updated": t.last_updated.isoformat() if t.last_updated else ""
-        })
+        }
+
+        if include_articles:
+            articles = db.query(models.Article).join(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).limit(10).all()
+            item["articles"] = [
+                {
+                    "id": a.id,
+                    "title": a.title,
+                    "url": a.url,
+                    "published_at": a.published_at.isoformat() if a.published_at else "",
+                    "excerpt": (a.raw_content[:200] + "...") if a.raw_content and len(a.raw_content) > 200 else (a.raw_content or "")
+                }
+                for a in articles
+            ]
+            if format == "csv":
+                item["article_citations"] = "; ".join([f"{a.title} ({a.url})" for a in articles])
+
+        data.append(item)
 
     # Sort exported records matching sort_by criterion
     if sort_by == "articles":
@@ -700,7 +719,9 @@ def export_topics(
     if format == "csv":
         output = io.StringIO()
         fieldnames = ["id", "title", "category", "article_count", "controversy_score", "sentiment_score", "summary", "first_seen", "last_updated"]
-        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        if include_articles:
+            fieldnames.append("article_citations")
+        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(data)
         csv_content = output.getvalue()

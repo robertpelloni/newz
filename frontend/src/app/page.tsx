@@ -1031,13 +1031,14 @@ export default function Dashboard() {
     }
   };
 
-  const handleExport = (format: "json" | "csv") => {
+  const handleExport = (format: "json" | "csv", includeArticles: boolean = false) => {
     setShowExportMenu(false);
     const url = new URL(`${API_BASE}/api/topics/export`);
     url.searchParams.append("format", format);
     url.searchParams.append("sort_by", sortBy);
     if (activeCategory !== "All") url.searchParams.append("category", activeCategory);
     if (searchQuery.trim()) url.searchParams.append("q", searchQuery.trim());
+    if (includeArticles) url.searchParams.append("include_articles", "true");
     window.open(url.toString(), "_blank");
   };
 
@@ -1269,6 +1270,13 @@ export default function Dashboard() {
                     className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-cyan-400 transition"
                   >
                     Export All (JSON)
+                  </button>
+                  <button
+                    onClick={() => handleExport("json", true)}
+                    className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-cyan-400 transition"
+                    title="Includes correlated article citations and text excerpts in JSON export"
+                  >
+                    Export with Articles (JSON)
                   </button>
                   <button
                     onClick={() => handleExport("csv")}

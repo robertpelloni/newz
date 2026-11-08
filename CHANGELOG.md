@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.9.4] - 2026-11-08
+### Added
+- **Export of Correlated Article Highlights and Excerpts**:
+  - Enhanced `GET /api/topics/export` in `backend/main.py` with `include_articles` query parameter, including correlated source article titles, URLs, publication dates, and text excerpts in JSON artifacts, and concatenated article citations in CSV exports.
+  - Added "Export with Articles (JSON)" action button to the global export dropdown menu in `frontend/src/app/page.tsx`.
+  - Added unit test `test_export_topics_with_correlated_articles` in `backend/tests/test_api.py` (29/29 backend tests passing).
+  - Verified Next.js production build and automated Playwright offline test suite (9/9 steps passing).
+
 ## [0.9.3] - 2026-11-08
 ### Added
 - **Deep Text Search Across Correlated Articles & Bookmark Notes**:

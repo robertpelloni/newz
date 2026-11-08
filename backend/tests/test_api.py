@@ -441,3 +441,24 @@ def test_topics_search_across_correlated_articles():
     # Validate no duplicate topic ids returned from joins
     ids = [t["id"] for t in data["items"]]
     assert len(ids) == len(set(ids))
+
+def test_export_topics_with_correlated_articles():
+    # 1. JSON export with include_articles=true
+    res = client.get("/api/topics/export?format=json&include_articles=true")
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data, list)
+    if len(data) > 0:
+        first = data[0]
+        assert "articles" in first
+        assert isinstance(first["articles"], list)
+        if len(first["articles"]) > 0:
+            art = first["articles"][0]
+            assert "title" in art
+            assert "url" in art
+            assert "excerpt" in art
+
+    # 2. CSV export with include_articles=true
+    res_csv = client.get("/api/topics/export?format=csv&include_articles=true")
+    assert res_csv.status_code == 200
+    assert "article_citations" in res_csv.text
