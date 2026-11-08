@@ -2,6 +2,19 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.8.7] - 2026-11-08
+### Added
+- Multi-criteria priority sorting for intelligence export reports (`GET /api/topics/export?sort_by=...`), exporting clusters strictly ordered by coverage density, controversy, sentiment polarity, or recency.
+- Included controversy score and sentiment score attributes within exported CSV and JSON artifacts.
+- Frontend export handler synchronization in `frontend/src/app/page.tsx` passing active sort state to generated reports.
+- Automated unit test `test_export_topics_with_sorting` in `backend/tests/test_api.py` (24/24 tests passing).
+
+## [0.8.6] - 2026-11-08
+### Added
+- Scoped sentiment pulse telemetry endpoint `GET /api/sentiment/pulse?category=...` in `backend/main.py` enabling category-level sentiment breakdown and polarity ratios.
+- Real-time category-filtered sentiment radar updates in `frontend/src/app/page.tsx`, updating top dashboard metrics when selecting different intelligence domains.
+- Automated unit test `test_sentiment_pulse_category_filter` in `backend/tests/test_api.py` (23/23 tests passing).
+
 ## [0.8.5] - 2026-11-08
 ### Added
 - Topic narrative entity relationship matrix endpoint `GET /api/topics/{topic_id}/entities` in `backend/main.py`, providing entity co-occurrence counts and citing article linkages.

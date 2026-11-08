@@ -406,9 +406,10 @@ export default function Dashboard() {
     setPage(1);
   }, [activeCategory, searchQuery, sortBy]);
 
-  // Fetch topics whenever category, search, sort, or pagination changes
+  // Fetch topics and telemetry whenever category, search, sort, or pagination changes
   useEffect(() => {
     fetchTopics();
+    fetchSystemData(activeCategory);
   }, [activeCategory, searchQuery, sortBy, page, pageSize]);
 
   // Fetch deep-dive modal
@@ -420,11 +421,15 @@ export default function Dashboard() {
     }
   }, [selectedTopicId]);
 
-  const fetchSystemData = async () => {
+  const fetchSystemData = async (cat?: string) => {
     try {
+      const activeCat = cat || activeCategory;
+      const pulseUrl = new URL(`${API_BASE}/api/sentiment/pulse`);
+      if (activeCat !== "All") pulseUrl.searchParams.append("category", activeCat);
+
       const [resStatus, resPulse, resSources] = await Promise.all([
         fetch(`${API_BASE}/api/system/status`),
-        fetch(`${API_BASE}/api/sentiment/pulse`),
+        fetch(pulseUrl.toString()),
         fetch(`${API_BASE}/api/sources`)
       ]);
       if (resStatus.ok) setStatus(await resStatus.json());
@@ -830,6 +835,7 @@ export default function Dashboard() {
     setShowExportMenu(false);
     const url = new URL(`${API_BASE}/api/topics/export`);
     url.searchParams.append("format", format);
+    url.searchParams.append("sort_by", sortBy);
     if (activeCategory !== "All") url.searchParams.append("category", activeCategory);
     if (searchQuery.trim()) url.searchParams.append("q", searchQuery.trim());
     window.open(url.toString(), "_blank");

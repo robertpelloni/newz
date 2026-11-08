@@ -403,32 +403,53 @@ def export_topics(
     format: str = Query("json", pattern="^(json|csv)$"),
     category: Optional[str] = None,
     q: Optional[str] = None,
+    sort_by: str = Query("latest", pattern="^(latest|articles|controversy|sentiment)$"),
     db: Session = Depends(get_db)
 ):
-    """Export clustered intelligence topics to CSV or JSON formats for analysis."""
+    """Export clustered intelligence topics to CSV or JSON formats with multi-criteria sorting."""
     query = db.query(models.Topic)
     if category and category.lower() != "all":
         query = query.filter(models.Topic.category.ilike(f"%{category}%"))
     if q:
         query = query.filter(models.Topic.title.ilike(f"%{q}%") | models.Topic.summary.ilike(f"%{q}%"))
 
-    topics = query.order_by(models.Topic.last_updated.desc()).all()
+    topics = query.all()
     data = []
     for t in topics:
         article_count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
+        latest_sentiment = db.query(models.Sentiment).filter(models.Sentiment.topic_id == t.id).order_by(models.Sentiment.id.desc()).first()
+        controversy_score = 0.0
+        sentiment_score = 0.0
+        if latest_sentiment and latest_sentiment.breakdown_json:
+            controversy_score = latest_sentiment.breakdown_json.get("controversy", 0.0)
+            sentiment_score = latest_sentiment.overall_score or 0.0
+
         data.append({
             "id": t.id,
             "title": t.title,
             "category": t.category or "General",
             "article_count": article_count,
             "summary": t.summary or "",
+            "controversy_score": round(controversy_score, 2),
+            "sentiment_score": round(sentiment_score, 2),
             "first_seen": t.first_seen.isoformat() if t.first_seen else "",
             "last_updated": t.last_updated.isoformat() if t.last_updated else ""
         })
 
+    # Sort exported records matching sort_by criterion
+    if sort_by == "articles":
+        data.sort(key=lambda x: (x["article_count"], x["last_updated"]), reverse=True)
+    elif sort_by == "controversy":
+        data.sort(key=lambda x: (x["controversy_score"], x["article_count"]), reverse=True)
+    elif sort_by == "sentiment":
+        data.sort(key=lambda x: abs(x["sentiment_score"]), reverse=True)
+    else:  # "latest" default
+        data.sort(key=lambda x: x["last_updated"], reverse=True)
+
     if format == "csv":
         output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=["id", "title", "category", "article_count", "summary", "first_seen", "last_updated"])
+        fieldnames = ["id", "title", "category", "article_count", "controversy_score", "sentiment_score", "summary", "first_seen", "last_updated"]
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(data)
         csv_content = output.getvalue()
@@ -561,16 +582,21 @@ def get_topic(
     }
 
 @app.get("/api/sentiment/pulse")
-def get_sentiment_pulse(db: Session = Depends(get_db)):
-    """Aggregate pulse and controversy metrics."""
-    sentiments = db.query(models.Sentiment).order_by(models.Sentiment.id.desc()).limit(100).all()
+def get_sentiment_pulse(category: Optional[str] = None, db: Session = Depends(get_db)):
+    """Aggregate pulse and controversy metrics with optional category breakdown."""
+    query = db.query(models.Sentiment)
+    if category and category.lower() != "all":
+        query = query.join(models.Topic).filter(models.Topic.category.ilike(f"%{category}%"))
+
+    sentiments = query.order_by(models.Sentiment.id.desc()).limit(100).all()
     if not sentiments:
         return {
             "overall_sentiment": 0.0,
             "positive_ratio": 0.33,
             "negative_ratio": 0.33,
             "neutral_ratio": 0.34,
-            "sample_size": 0
+            "sample_size": 0,
+            "category": category or "All"
         }
 
     scores = [s.overall_score for s in sentiments if s.overall_score is not None]
@@ -589,7 +615,8 @@ def get_sentiment_pulse(db: Session = Depends(get_db)):
         "positive_ratio": round(pos / total, 2),
         "negative_ratio": round(neg / total, 2),
         "neutral_ratio": round(neu / total, 2),
-        "sample_size": len(scores)
+        "sample_size": len(scores),
+        "category": category or "All"
     }
 
 @app.post("/api/actions/sync")

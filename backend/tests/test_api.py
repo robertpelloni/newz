@@ -301,3 +301,36 @@ def test_topic_detail_entity_matrix_endpoint():
             assert "entity" in ent
             assert "mention_count" in ent
             assert "citations" in ent
+
+def test_sentiment_pulse_category_filter():
+    # 1. Query pulse overall
+    res_all = client.get("/api/sentiment/pulse")
+    assert res_all.status_code == 200
+    data_all = res_all.json()
+    assert "overall_sentiment" in data_all
+    assert "category" in data_all
+    assert data_all["category"] == "All"
+
+    # 2. Query pulse scoped to Technology
+    res_tech = client.get("/api/sentiment/pulse?category=Technology")
+    assert res_tech.status_code == 200
+    data_tech = res_tech.json()
+    assert "overall_sentiment" in data_tech
+    assert data_tech["category"] == "Technology"
+    assert "positive_ratio" in data_tech
+    assert "negative_ratio" in data_tech
+
+def test_export_topics_with_sorting():
+    # 1. JSON export with sort_by=articles
+    res_json = client.get("/api/topics/export?format=json&sort_by=articles")
+    assert res_json.status_code == 200
+    items = res_json.json()
+    assert isinstance(items, list)
+    if len(items) >= 2:
+        assert items[0]["article_count"] >= items[1]["article_count"]
+
+    # 2. CSV export with sort_by=controversy
+    res_csv = client.get("/api/topics/export?format=csv&sort_by=controversy")
+    assert res_csv.status_code == 200
+    assert "text/csv" in res_csv.headers["content-type"]
+    assert "controversy_score" in res_csv.text
