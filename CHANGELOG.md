@@ -2,6 +2,14 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [0.9.5] - 2026-11-08
+### Added
+- **Batch Bookmark & Unbookmark Controls for Filtered Clusters**:
+  - Implemented `handleBatchBookmarkVisible` and `handleBatchUnbookmarkVisible` in `frontend/src/app/page.tsx` allowing one-click batch bookmarking or removal of all visible topics on the current view/page.
+  - Multi-tier synchronization updates across both IndexedDB (`saveBookmarksToIndexedDB`) and `localStorage` (`omnifeed_bookmarks`) with real-time feedback toast notifications.
+  - Added "★ Bookmark Visible" and "☆ Clear" batch control pills directly beside the topic count header in the main dashboard view.
+  - Validated batch bookmarking workflows and counter badges via automated Playwright testing.
+
 ## [0.9.4] - 2026-11-08
 ### Added
 - **Export of Correlated Article Highlights and Excerpts**:

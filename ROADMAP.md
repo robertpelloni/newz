@@ -62,5 +62,6 @@
 - [x] Subscribed Feed Health Diagnostics Summary & Channel Monitoring (v0.9.2).
 - [x] Deep Text Search Across Correlated Articles & Bookmark Notes (v0.9.3).
 - [x] Export of Correlated Article Highlights and Excerpts (v0.9.4).
+- [x] Batch Bookmark & Unbookmark Controls for Filtered Clusters (v0.9.5).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

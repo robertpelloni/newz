@@ -407,6 +407,46 @@ export default function Dashboard() {
     });
   };
 
+  const handleBatchBookmarkVisible = () => {
+    const visibleTopics = showOnlyBookmarks
+      ? topics.filter((t) => bookmarkedIds.includes(t.id))
+      : topics;
+    if (visibleTopics.length === 0) return;
+
+    setBookmarkedIds((prev) => {
+      const set = new Set(prev);
+      visibleTopics.forEach((t) => set.add(t.id));
+      const updated = Array.from(set);
+      try {
+        localStorage.setItem("omnifeed_bookmarks", JSON.stringify(updated));
+        saveBookmarksToIndexedDB(updated).catch(() => {});
+      } catch (_) {}
+      setLiveAlert(`Bookmarked all ${visibleTopics.length} visible topics to offline vault!`);
+      return updated;
+    });
+  };
+
+  const handleBatchUnbookmarkVisible = () => {
+    const visibleTopics = showOnlyBookmarks
+      ? topics.filter((t) => bookmarkedIds.includes(t.id))
+      : topics;
+    if (visibleTopics.length === 0) return;
+
+    const visibleIds = new Set(visibleTopics.map((t) => t.id));
+    setBookmarkedIds((prev) => {
+      const updated = prev.filter((id) => !visibleIds.has(id));
+      try {
+        localStorage.setItem("omnifeed_bookmarks", JSON.stringify(updated));
+        saveBookmarksToIndexedDB(updated).catch(() => {});
+        visibleIds.forEach((id) => {
+          deleteBookmarkAnnotationFromIndexedDB(id).catch(() => {});
+        });
+      } catch (_) {}
+      setLiveAlert(`Cleared ${visibleTopics.length} visible topics from reading list.`);
+      return updated;
+    });
+  };
+
   const handleSaveAnnotation = async (topicId: number) => {
     const rawTags = annotationTagsInput
       .split(/[,\s]+/)
@@ -1508,12 +1548,34 @@ export default function Dashboard() {
         {/* Dynamic Clustered Topics Grid */}
         <section className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h2 className="text-base font-bold text-slate-200 flex items-center space-x-2">
-              <span>Dynamic Clustered Topics</span>
-              <span className="text-xs font-normal text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
-                {totalTopics} total
-              </span>
-            </h2>
+            <div className="flex items-center space-x-3 flex-wrap gap-2">
+              <h2 className="text-base font-bold text-slate-200 flex items-center space-x-2">
+                <span>Dynamic Clustered Topics</span>
+                <span className="text-xs font-normal text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
+                  {totalTopics} total
+                </span>
+              </h2>
+
+              {topics.length > 0 && (
+                <div className="flex items-center space-x-1.5 text-[11px]">
+                  <button
+                    onClick={handleBatchBookmarkVisible}
+                    title="Bookmark all visible topic clusters on this page for offline vault access"
+                    className="px-2 py-0.5 bg-amber-950/40 text-amber-300 border border-amber-800/60 rounded hover:bg-amber-900/60 transition flex items-center space-x-1"
+                  >
+                    <span>★</span>
+                    <span>Bookmark Visible</span>
+                  </button>
+                  <button
+                    onClick={handleBatchUnbookmarkVisible}
+                    title="Remove visible topic clusters on this page from bookmarks"
+                    className="px-2 py-0.5 bg-slate-800/60 text-slate-400 border border-slate-700 rounded hover:bg-slate-700/60 hover:text-slate-200 transition"
+                  >
+                    <span>☆ Clear</span>
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
