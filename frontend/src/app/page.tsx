@@ -140,6 +140,10 @@ export default function Dashboard() {
   const [alertTone, setAlertTone] = useState<"chime" | "radar" | "sonar">("chime");
   const [showAudioSettings, setShowAudioSettings] = useState<boolean>(false);
   const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(false);
+  const [autopilotStats, setAutopilotStats] = useState<{ runCount: number; lastRun: string | null }>({
+    runCount: 0,
+    lastRun: null,
+  });
 
   // Network State Diagnostics & Intermittent Connectivity Sync Engine
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
@@ -532,6 +536,46 @@ export default function Dashboard() {
     }
   };
 
+  const triggerOrchestratedPipelineSync = async () => {
+    if (isSyncingDelta || isOffline) return;
+    setIsSyncingDelta(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/sync/pipeline`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.autopilot) {
+          setAutopilotStats({
+            runCount: data.autopilot.run_count,
+            lastRun: data.autopilot.last_run,
+          });
+        }
+        if (data.telemetry) {
+          setStatus((prev) => prev ? { ...prev, counts: data.telemetry } : null);
+        }
+        await recordSyncAuditEntry({
+          action_type: "pipeline_sync",
+          status: "synced",
+          details: `Pipeline sync cycle #${data.autopilot?.run_count || 1} orchestrated`,
+          timestamp: new Date().toISOString(),
+        });
+        setLiveAlert(`⚡ Autopilot Cycle #${data.autopilot?.run_count || 1} synchronized.`);
+        setTimeout(() => setLiveAlert(null), 3000);
+        fetchTopics();
+        setLastSyncTime(new Date().toLocaleTimeString());
+      }
+    } catch (err: any) {
+      console.warn("Autopilot pipeline sync error:", err);
+      await recordSyncAuditEntry({
+        action_type: "pipeline_sync",
+        status: "failed",
+        details: `Pipeline error: ${err?.message || "Connection timeout"}`,
+        timestamp: new Date().toISOString(),
+      });
+    } finally {
+      setIsSyncingDelta(false);
+    }
+  };
+
   const toggleBookmark = (id: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setBookmarkedIds((prev) => {
@@ -748,6 +792,39 @@ export default function Dashboard() {
               if (Array.isArray(payload.recent_topics) && payload.recent_topics.length > 0) {
                 saveTopicsToIndexedDB(payload.recent_topics).catch(() => {});
               }
+            } else if (payload.event === "pipeline_completed") {
+              if (payload.cycle) {
+                setAutopilotStats((prev) => ({
+                  runCount: payload.cycle,
+                  lastRun: payload.timestamp || prev.lastRun,
+                }));
+              }
+              setLiveAlert(`⚡ Autopilot Cycle #${payload.cycle || 1}: Ingestion & clustering completed.`);
+              if (audioAlertsEnabled) playChime();
+
+              if (payload.telemetry) {
+                setStatus((prev) => prev ? { ...prev, counts: payload.telemetry } : null);
+              }
+              if (payload.overall_sentiment !== undefined) {
+                setPulse((prev) => prev ? { ...prev, overall_sentiment: payload.overall_sentiment } : null);
+              }
+              if (Array.isArray(payload.recent_topics) && payload.recent_topics.length > 0) {
+                saveTopicsToIndexedDB(payload.recent_topics).catch(() => {});
+                setTopics((prevTopics) => {
+                  if (page === 1) {
+                    const existingIds = new Set(prevTopics.map((t) => t.id));
+                    const fresh = payload.recent_topics.filter((t: Topic) => !existingIds.has(t.id));
+                    return [...fresh, ...prevTopics].slice(0, pageSize);
+                  }
+                  return prevTopics;
+                });
+              }
+              recordSyncAuditEntry({
+                action_type: "pipeline_sync",
+                status: "synced",
+                details: `Autopilot cycle #${payload.cycle || 1}: Live telemetry & health diagnostics updated`,
+                timestamp: payload.timestamp || new Date().toISOString(),
+              }).catch(() => {});
             } else if (payload.event === "sync_completed" || payload.event === "firehose_pulse") {
               setLiveAlert(payload.message || "New stories ingested & clustered!");
               if (audioAlertsEnabled) playChime();
@@ -810,10 +887,14 @@ export default function Dashboard() {
     connectWebSocket();
 
     const interval = setInterval(fetchSystemData, 15000);
-    // Periodic incremental delta sync (every 60s) for intermittent connectivity networks
+    // Periodic incremental delta sync or autopilot pipeline orchestration (every 60s)
     const deltaInterval = setInterval(() => {
       if (navigator.onLine && !isOffline) {
-        triggerIncrementalDeltaSync();
+        if (autopilotEnabled) {
+          triggerOrchestratedPipelineSync();
+        } else {
+          triggerIncrementalDeltaSync();
+        }
       }
     }, 60000);
 
@@ -1449,11 +1530,14 @@ export default function Dashboard() {
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ enabled: nextState, interval_seconds: 60 }),
                 });
+                if (nextState) {
+                  triggerOrchestratedPipelineSync();
+                }
                 setLiveAlert(nextState ? "Autopilot automated background ingestion enabled." : "Autopilot paused.");
                 setTimeout(() => setLiveAlert(null), 3000);
               } catch (_) {}
             }}
-            title={autopilotEnabled ? "Autopilot Active: Background ingestion and clustering running automatically" : "Enable Autopilot: Automatically ingest feeds and stream deltas"}
+            title={autopilotEnabled ? `Autopilot Active (${autopilotStats.runCount} cycles completed): Background pipeline running automatically` : "Enable Autopilot: Automatically ingest feeds and stream deltas"}
             className={`px-2.5 py-1.5 text-xs font-semibold rounded border transition flex items-center space-x-1.5 ${
               autopilotEnabled
                 ? "bg-cyan-500/20 text-cyan-400 border-cyan-500/60 shadow-[0_0_10px_rgba(6,182,212,0.2)]"
@@ -1461,7 +1545,7 @@ export default function Dashboard() {
             }`}
           >
             <span className={`inline-block w-1.5 h-1.5 rounded-full ${autopilotEnabled ? "bg-cyan-400 animate-ping" : "bg-slate-500"}`} />
-            <span>{autopilotEnabled ? "⚡ Autopilot On" : "⚡ Autopilot"}</span>
+            <span>{autopilotEnabled ? `⚡ Autopilot #${autopilotStats.runCount || 1}` : "⚡ Autopilot"}</span>
           </button>
 
           {/* Audio Chime Notification Toggle & Volume Controls */}
@@ -2656,7 +2740,14 @@ export default function Dashboard() {
                 </span>
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => setShowSyncAuditHistory((prev) => !prev)}
+                    onClick={async () => {
+                      const nextState = !showSyncAuditHistory;
+                      setShowSyncAuditHistory(nextState);
+                      if (nextState) {
+                        const logs = await getSyncAuditHistory(25);
+                        setSyncAuditLogs(logs);
+                      }
+                    }}
                     className="px-2 py-0.5 text-[11px] text-cyan-400 hover:text-cyan-300 hover:underline"
                   >
                     {showSyncAuditHistory ? "Hide Sync Audit Log ▲" : "View Sync Audit Log ▼"}

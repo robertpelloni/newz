@@ -2,6 +2,20 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [1.0.4] - 2026-11-08
+### Added
+- **Orchestrated Autopilot Ingestion Pipeline Endpoint**:
+  - Implemented `POST /api/sync/pipeline` in `backend/main.py` executing an end-to-end coordinated ingestion lifecycle:
+    - Runs multi-source RSS/Atom channel ingestion, deduplication, Jaccard similarity clustering, sentiment lexicon scoring, and timeline correlation (`run_pipeline_standalone()`).
+    - Executes automated channel reachability and latency diagnostics across all active news feeds (`get_sources_health_summary()`).
+    - Captures updated live telemetry snapshots and increments cycle execution counters (`last_run`, `run_count`).
+    - Broadcasts real-time WebSocket notifications (`pipeline_completed`) to all connected frontend clients.
+  - Added unit test `test_orchestrated_sync_pipeline_endpoint` in `backend/tests/test_api.py` (31/31 backend tests passing).
+- **Interactive Autopilot Cycle Tracking & Sync Audit History**:
+  - Wired frontend "⚡ Autopilot" toggle button in `frontend/src/app/page.tsx` to automatically trigger `POST /api/sync/pipeline` on interval, displaying real-time cycle execution counters (`⚡ Autopilot #<count>`).
+  - Recorded pipeline synchronization operations in client-side IndexedDB `sync_audit_store` for transparent offline auditing.
+  - Linked the "Show Sync Audit Log" toggle in the Offline Storage Manager modal to dynamically refresh and display the latest sync records.
+
 ## [1.0.3] - 2026-11-08
 ### Added
 - **Intermittent Delta Sync Deep Story Ingestion & Pre-Caching**:

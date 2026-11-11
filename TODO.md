@@ -75,3 +75,4 @@
 - [x] Offline sync audit history logging, conflict drawer inspector, and resilient queue reconciliation (v1.0.1).
 - [x] Audio alert volume slider, tone profiles (chime, radar, sonar), and live test controls (v1.0.2).
 - [x] Intermittent delta sync deep story ingestion & pre-caching pipeline into IndexedDB (v1.0.3).
+- [x] Orchestrated autopilot ingestion pipeline endpoint (`POST /api/sync/pipeline`), cycle tracking, and sync audit logging (v1.0.4).

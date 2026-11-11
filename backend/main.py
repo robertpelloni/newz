@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query, WebSocket, WebSocket
 from fastapi.responses import Response, JSONResponse
 from sqlalchemy.orm import Session
 from typing import Optional, List, Set, Dict, Any
+from datetime import datetime, timezone
 import os
 import signal
 import sys
@@ -995,6 +996,52 @@ async def set_autopilot_status(payload: dict):
     if "interval_seconds" in payload and isinstance(payload["interval_seconds"], (int, float)):
         autopilot_state["interval_seconds"] = max(10, int(payload["interval_seconds"]))
     return {"status": "success", "autopilot": autopilot_state}
+
+@app.post("/api/sync/pipeline")
+async def run_orchestrated_sync_pipeline(db: Session = Depends(get_db)):
+    """
+    Executes an orchestrated end-to-end ingestion and clustering cycle:
+    1. Multi-source ingestion & clustering
+    2. Concurrent feed health diagnostics & latency heartbeat probing
+    3. Live telemetry snapshotting and autopilot cycle counters
+    4. Real-time WebSocket event broadcast
+    """
+    try:
+        from worker.tasks import run_pipeline_standalone
+        pipeline_res = run_pipeline_standalone()
+
+        # Probe feed health
+        health_summary = get_sources_health_summary(db)
+
+        # Refresh snapshot
+        snapshot = get_live_telemetry_snapshot(db)
+
+        # Update autopilot cycle
+        now_iso = datetime.now(timezone.utc).isoformat()
+        autopilot_state["last_run"] = now_iso
+        autopilot_state["run_count"] += 1
+
+        # Broadcast WebSocket event
+        await manager.broadcast({
+            "event": "pipeline_completed",
+            "cycle": autopilot_state["run_count"],
+            "timestamp": now_iso,
+            "pipeline": pipeline_res,
+            "health": health_summary,
+            "telemetry": snapshot["counts"],
+            "overall_sentiment": snapshot["overall_sentiment"],
+            "recent_topics": snapshot["recent_topics"]
+        })
+
+        return {
+            "status": "success",
+            "pipeline": pipeline_res,
+            "health": health_summary,
+            "telemetry": snapshot["counts"],
+            "autopilot": autopilot_state
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/system/shutdown")
 def shutdown_system():

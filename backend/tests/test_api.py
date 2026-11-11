@@ -491,3 +491,16 @@ def test_sources_heartbeat_trigger():
     assert "sources" in data
     assert isinstance(data["sources"], list)
     assert 0.0 <= data["uptime_percentage"] <= 100.0
+
+def test_orchestrated_sync_pipeline_endpoint():
+    res = client.post("/api/sync/pipeline")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert "pipeline" in data
+    assert "health" in data
+    assert "telemetry" in data
+    assert "autopilot" in data
+    assert isinstance(data["pipeline"], int) or isinstance(data["pipeline"], dict)
+    assert data["autopilot"]["run_count"] >= 1
+    assert data["health"]["total_sources"] >= 0
