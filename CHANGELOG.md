@@ -2,6 +2,243 @@
 
 Document every adjustment. Track a single, global version string/date/build number sourced from `VERSION.md`.
 
+## [1.0.4] - 2026-11-08
+### Added
+- **Orchestrated Autopilot Ingestion Pipeline Endpoint**:
+  - Implemented `POST /api/sync/pipeline` in `backend/main.py` executing an end-to-end coordinated ingestion lifecycle:
+    - Runs multi-source RSS/Atom channel ingestion, deduplication, Jaccard similarity clustering, sentiment lexicon scoring, and timeline correlation (`run_pipeline_standalone()`).
+    - Executes automated channel reachability and latency diagnostics across all active news feeds (`get_sources_health_summary()`).
+    - Captures updated live telemetry snapshots and increments cycle execution counters (`last_run`, `run_count`).
+    - Broadcasts real-time WebSocket notifications (`pipeline_completed`) to all connected frontend clients.
+  - Added unit test `test_orchestrated_sync_pipeline_endpoint` in `backend/tests/test_api.py` (31/31 backend tests passing).
+- **Interactive Autopilot Cycle Tracking & Sync Audit History**:
+  - Wired frontend "⚡ Autopilot" toggle button in `frontend/src/app/page.tsx` to automatically trigger `POST /api/sync/pipeline` on interval, displaying real-time cycle execution counters (`⚡ Autopilot #<count>`).
+  - Recorded pipeline synchronization operations in client-side IndexedDB `sync_audit_store` for transparent offline auditing.
+  - Linked the "Show Sync Audit Log" toggle in the Offline Storage Manager modal to dynamically refresh and display the latest sync records.
+
+## [1.0.3] - 2026-11-08
+### Added
+- **Intermittent Delta Sync Deep Story Ingestion & Pre-Caching**:
+  - Enhanced incremental delta sync endpoint (`GET /api/topics/delta`) in `backend/main.py` with `category` domain filtering and optional `include_details=true` query parameter.
+  - When `include_details=true`, delta sync batches embed comprehensive correlated source article excerpts, narrative timeline milestones, extracted entity markers, and sentiment breakdowns directly into the payload.
+  - Extended frontend delta sync engine (`triggerIncrementalDeltaSync`) in `frontend/src/app/page.tsx` to automatically persist fetched deep-dive story objects directly into IndexedDB `details_store` (`saveTopicDetailToIndexedDB`) alongside summary topic cards.
+  - Added automatic execution audit tracking recording `delta_sync` operations with itemized counts into `sync_audit_store` for full offline transparency.
+  - Added backend unit and integration tests in `backend/tests/test_api.py` validating category-filtered delta sync and embedded topic detail structures (30/30 backend tests passing).
+  - Verified end-to-end with Playwright and automated offline test suite (9/9 passing).
+
+## [1.0.2] - 2026-11-08
+### Added
+- **Audio Alert Volume & Tone Synthesis Controls**:
+  - Implemented configurable audio volume slider (0% to 100%) and tone profile synthesis (`chime`, `radar`, `sonar`) via Web Audio API without external audio dependencies.
+  - Added persistent audio preferences in LocalStorage (`omnifeed_audio_volume`, `omnifeed_alert_tone`).
+  - Added popover configuration UI with live audio alert test playback in the header operations bar.
+
+## [1.0.1] - 2026-11-08
+### Added
+- **Sync Audit Logging & Conflict History**:
+  - Implemented `sync_audit_store` in IndexedDB v4 (`frontend/src/utils/offlineStore.ts`) with functions `recordSyncAuditEntry`, `getSyncAuditHistory`, and `clearSyncAuditHistory` tracking background and manual synchronization replay history.
+  - Added collapsible Sync Audit History & Conflict Log drawer in the Offline Storage & Cache Manager modal displaying real-time execution status badges (`synced`, `failed`, `conflict_resolved`), itemized details, and execution timestamps.
+  - Implemented `reconcileSyncQueue` and structured action metadata (`retry_count`, `last_error`, `status`) to avoid duplicate background operations and gracefully track offline failures.
+  - Ensured offline sync queue actions in error catch blocks persist concurrently to IndexedDB `metrics_store`.
+
+## [1.0.0] - 2026-11-08
+### Added
+- **Production General Availability & Rapid Category Hotkeys**:
+  - Implemented numerical keyboard hotkeys `1` through `7` in `frontend/src/app/page.tsx` allowing instant switching across intelligence domains ("All", "General", "Technology", "Business", "Politics", "Science", "Entertainment") without mouse usage.
+  - Enhanced the Keyboard Shortcuts Reference modal with domain switching guidance (`1 – 7`).
+  - Reached Production General Availability (v1.0.0) milestone with consolidated single-page dashboard, dual-tier SQLite/PostgreSQL persistence, local AI summarization, real-time WebSocket streaming, PWA offline caching, IndexedDB v3 vault, feed health heartbeat diagnostics, and full desktop Tauri v2 packaging.
+
+## [0.9.9] - 2026-11-08
+### Added
+- **Periodic Automated Feed Health Heartbeat & Diagnostics**:
+  - Implemented `POST /api/sources/heartbeat` in `backend/main.py` executing concurrent HTTP latency probing and uptime telemetry across all registered RSS/Atom feeds, returning `SourceHealthSummaryResponse`.
+  - Added "💓 Heartbeat" interactive action button in the Feed Sources modal of `frontend/src/app/page.tsx` updating overall channel reachability metrics, average latencies, and per-source status badges.
+  - Added unit test `test_sources_heartbeat_trigger` in `backend/tests/test_api.py` (30/30 backend tests passing).
+  - Validated with Playwright tests, offline caching suite (9/9 passed), and screenshot verification.
+
+## [0.9.8] - 2026-11-08
+### Added
+- **Offline Storage Auto-Compaction & Quota Governance**:
+  - Implemented `compactOfflineVault(preserveLimit)` in `frontend/src/utils/offlineStore.ts` pruning oldest unbookmarked story details from IndexedDB `details_store` while strictly preserving bookmarked topics, user notes/tags, feed sources, and pending offline sync actions.
+  - Implemented `getStorageQuotaEstimate()` in `frontend/src/utils/offlineStore.ts` querying `navigator.storage.estimate()` for total disk quota allocation and active utilization percentages.
+  - Integrated Storage Quota Governance progress bar and telemetry badges in the Offline Storage & Cache Manager modal of `frontend/src/app/page.tsx`.
+  - Added "🗜️ Compact Vault" trigger button with live feedback notifications informing users of pruned detail counts.
+  - Validated compaction behavior, quota calculations, and visual rendering via Playwright end-to-end tests and visual screenshot inspection.
+
+## [0.9.7] - 2026-11-08
+### Added
+- **Keyboard Shortcut Navigation & Accessibility Controls**:
+  - Implemented global `keydown` event listener in `frontend/src/app/page.tsx` supporting rapid triaging and keyboard-driven navigation:
+    - `j` / `ArrowRight`: Navigate forward to the next topic cluster card across pages.
+    - `k` / `ArrowLeft`: Navigate backward to the previous topic cluster card across pages.
+    - `Enter`: Open focused cluster deep-dive modal.
+    - `b`: Toggle bookmark on focused cluster card or inside active deep-dive modal.
+    - `/`: Focus search bar input field instantly.
+    - `Escape`: Close active modal or blur search input.
+    - `?`: Toggle Keyboard Shortcuts Reference modal.
+  - Added visual focus ring indicator (`ring-2 ring-cyan-500/60 shadow-lg`) highlighting the active topic cluster card during keyboard traversal.
+  - Added "⌨️ Keys" quick-access action button to dashboard header opening the Keyboard Shortcuts Reference dialog.
+  - Added accessible Keyboard Shortcuts Reference modal dialog detailing all keybindings.
+  - Automated Playwright end-to-end verification of keyboard traversal, modal triggers, bookmarking, and visual modal rendering.
+
+## [0.9.6] - 2026-11-08
+### Added
+- **Dual-Storage Offline Sync Queue in IndexedDB & Vault Backup Preservation**:
+  - Implemented `saveSyncQueueToIndexedDB` and `getSyncQueueFromIndexedDB` in `frontend/src/utils/offlineStore.ts` storing uncommitted sync operations in IndexedDB `metrics_store`.
+  - Added dual-write and fallback synchronization across IndexedDB and `localStorage` in `frontend/src/app/page.tsx` during offline queue enqueue, replay, and purge.
+  - Included pending sync queue operations (`syncQueue`) in offline vault JSON export archives and restoration workflows (`importOfflineVault`).
+  - Extended Playwright automated test suite in `scripts/test_offline_data_access.py` validating IndexedDB sync queue persistence.
+
+## [0.9.5] - 2026-11-08
+### Added
+- **Batch Bookmark & Unbookmark Controls for Filtered Clusters**:
+  - Implemented `handleBatchBookmarkVisible` and `handleBatchUnbookmarkVisible` in `frontend/src/app/page.tsx` allowing one-click batch bookmarking or removal of all visible topics on the current view/page.
+  - Multi-tier synchronization updates across both IndexedDB (`saveBookmarksToIndexedDB`) and `localStorage` (`omnifeed_bookmarks`) with real-time feedback toast notifications.
+  - Added "★ Bookmark Visible" and "☆ Clear" batch control pills directly beside the topic count header in the main dashboard view.
+  - Validated batch bookmarking workflows and counter badges via automated Playwright testing.
+
+## [0.9.4] - 2026-11-08
+### Added
+- **Export of Correlated Article Highlights and Excerpts**:
+  - Enhanced `GET /api/topics/export` in `backend/main.py` with `include_articles` query parameter, including correlated source article titles, URLs, publication dates, and text excerpts in JSON artifacts, and concatenated article citations in CSV exports.
+  - Added "Export with Articles (JSON)" action button to the global export dropdown menu in `frontend/src/app/page.tsx`.
+  - Added unit test `test_export_topics_with_correlated_articles` in `backend/tests/test_api.py` (29/29 backend tests passing).
+  - Verified Next.js production build and automated Playwright offline test suite (9/9 steps passing).
+
+## [0.9.3] - 2026-11-08
+### Added
+- **Deep Text Search Across Correlated Articles & Bookmark Notes**:
+  - Expanded backend search in `GET /api/topics` and `GET /api/topics/export` (`backend/main.py`) to join correlated source articles (`ArticleTopic` -> `Article`), searching across topic title, summary, article headline, and raw article text content with distinct topic resolution.
+  - Enhanced client-side offline and bookmark search in `frontend/src/app/page.tsx` to search across custom bookmark annotation notes, categorization tags, and offline article text.
+  - Added automated unit test `test_topics_search_across_correlated_articles` in `backend/tests/test_api.py` (28/28 backend tests passing).
+  - Validated offline Playwright suite `scripts/test_offline_data_access.py` and visual UI responsiveness.
+
+## [0.9.2] - 2026-11-08
+### Added
+- **Subscribed Feed Health Diagnostics Summary & Channel Monitoring**:
+  - Implemented `GET /api/sources/health-summary` in `backend/main.py` aggregating reachability, concurrent latency measurements, and system uptime percentages across all registered feed sources.
+  - Added `SourceHealthSummaryResponse` schema in `backend/schemas.py`.
+  - Added dynamic uptime percentage and latency telemetry badges in the "Feed Sources & Subscriptions" modal of `frontend/src/app/page.tsx`.
+  - Added real-time degraded channel warnings (`⚠️ <count>`) on the navbar Feeds button.
+  - Added automated unit and integration test `test_sources_health_summary_endpoint` in `backend/tests/test_api.py` (27/27 backend tests passing).
+
+## [0.9.1] - 2026-11-08
+### Added
+- **Intermittent Connectivity Offline Resiliency & Automated Periodic Delta Sync**:
+  - Incremental topic delta synchronization endpoint (`GET /api/topics/delta?since=...`) in `backend/main.py` allowing low-bandwidth updates and timestamp-based diff ingestion.
+  - Added `TopicDeltaResponse` schema in `backend/schemas.py`.
+  - Added interactive "🔄 Delta" sync trigger and live roundtrip latency indicator (`● Live WS <latency>ms`) in the navigation bar of `frontend/src/app/page.tsx`.
+  - Implemented automatic periodic 60-second delta synchronization background worker and window online reconnection handlers.
+  - Enhanced offline queue replay with partial failure resilience: unfulfilled actions remain preserved in `omnifeed_sync_queue` if network drops intermittently mid-replay.
+  - Automated unit test `test_topics_incremental_delta_sync` in `backend/tests/test_api.py` (26/26 backend tests passing).
+
+## [0.9.0] - 2026-11-08
+### Added
+- **Custom Bookmark Annotation Notes & Categorization Tags**:
+  - Upgraded IndexedDB offline database schema to `DB_VERSION = 3` with dedicated `bookmark_notes` object store in `frontend/src/utils/offlineStore.ts`.
+  - Added persistent client-side storage helpers `saveBookmarkAnnotationToIndexedDB`, `getBookmarkAnnotationsFromIndexedDB`, and `deleteBookmarkAnnotationFromIndexedDB`.
+  - Integrated interactive bookmark annotation and tag editor within the topic cluster deep-dive modal in `frontend/src/app/page.tsx` (`📝 Edit Note / Tags`, rich note textarea, tag chips editor, and save handler).
+  - Rendered inline notes and tag badges on bookmarked cards in the main feed view.
+  - Added dynamic bookmark tag filter pills (`#tag`) in the header filtering bar when viewing saved bookmarks.
+  - Enriched universal Reading List export in both JSON and Markdown formats (`handleExportBookmarks`) to include custom user notes and associated tag taxonomies.
+  - Fully preserved bookmark annotations in offline vault JSON archives (`exportOfflineVault` and `importOfflineVault`).
+  - Extended Playwright automated test suite in `scripts/test_offline_data_access.py` validating IndexedDB v3 `bookmark_notes` persistence.
+
+## [0.8.9] - 2026-11-08
+### Added
+- **IndexedDB Feed Vault & Disconnected Source Resilience**:
+  - Upgraded IndexedDB offline intelligence database schema to `DB_VERSION = 2` with dedicated `sources_store`.
+  - Added persistent client-side caching of all news and custom RSS/Atom feeds via `saveSourcesToIndexedDB` and `getSourcesFromIndexedDB`.
+  - Wired optimistic offline updates for feed subscription additions and deletions directly into the IndexedDB vault, ensuring channels remain accessible across browser restarts during complete network disconnections.
+  - Extended the "Offline Intelligence Storage" modal with "Saved Feeds" metric cards, updated footprint analytics, and full feed sources preservation in JSON vault exports and imports.
+  - Enhanced automated Playwright suite in `scripts/test_offline_data_access.py` to assert IndexedDB feed source persistence.
+
+## [0.8.8] - 2026-11-08
+### Added
+- Standardized OPML 2.0 subscription export endpoint (`GET /api/sources/opml`) in `backend/main.py` formatting all active feed subscriptions into compliant XML outline trees.
+- Bulk OPML subscription import endpoint (`POST /api/sources/opml`) in `backend/main.py` parsing XML/JSON outlines with deduplication and transactional insertion.
+- Frontend OPML Export and Import controls in `frontend/src/app/page.tsx` within the Feed Subscriptions & Sources modal with toast notifications.
+- Automated unit and integration test `test_sources_opml_export_and_import` in `backend/tests/test_api.py` (25/25 tests passing).
+
+## [0.8.7] - 2026-11-08
+### Added
+- Multi-criteria priority sorting for intelligence export reports (`GET /api/topics/export?sort_by=...`), exporting clusters strictly ordered by coverage density, controversy, sentiment polarity, or recency.
+- Included controversy score and sentiment score attributes within exported CSV and JSON artifacts.
+- Frontend export handler synchronization in `frontend/src/app/page.tsx` passing active sort state to generated reports.
+- Automated unit test `test_export_topics_with_sorting` in `backend/tests/test_api.py` (24/24 tests passing).
+
+## [0.8.6] - 2026-11-08
+### Added
+- Scoped sentiment pulse telemetry endpoint `GET /api/sentiment/pulse?category=...` in `backend/main.py` enabling category-level sentiment breakdown and polarity ratios.
+- Real-time category-filtered sentiment radar updates in `frontend/src/app/page.tsx`, updating top dashboard metrics when selecting different intelligence domains.
+- Automated unit test `test_sentiment_pulse_category_filter` in `backend/tests/test_api.py` (23/23 tests passing).
+
+## [0.8.5] - 2026-11-08
+### Added
+- Topic narrative entity relationship matrix endpoint `GET /api/topics/{topic_id}/entities` in `backend/main.py`, providing entity co-occurrence counts and citing article linkages.
+- Interactive entity network explorer in the topic cluster deep-dive modal in `frontend/src/app/page.tsx`, enabling click-to-filter highlighting of source articles mentioning selected entities.
+- Automated unit test `test_topic_detail_entity_matrix_endpoint` in `backend/tests/test_api.py` (22/22 tests passing).
+
+## [0.8.4] - 2026-11-08
+### Added
+- Bulk offline topic deep-dive pre-caching mechanism (`⬇️ Pre-Cache All Deep-Dives`) in `frontend/src/app/page.tsx`, allowing full narrative storylines, articles, and timelines to be indexed into `details_store` for zero-connectivity browsing.
+- Topic card offline cached badge indicators (`💾 Cached`), visually confirming which story clusters are available locally in the IndexedDB vault during offline operations.
+- Extended automated Playwright test suite in `scripts/test_offline_data_access.py` to validate pre-caching and offline cached badges.
+
+## [0.8.3] - 2026-11-07
+### Added
+- Chronological ordering and polarity filtering query parameters (`timeline_order`, `min_polarity`) for `GET /api/topics/{topic_id}` in `backend/main.py`.
+- Interactive timeline direction controls (Oldest First / Newest First) and polarity selector (+ Positive, - Negative, All Sentiment) in the topic cluster deep-dive modal in `frontend/src/app/page.tsx`.
+- Automated unit test `test_topic_detail_timeline_ordering_and_filtering` in `backend/tests/test_api.py` (21/21 tests passing).
+
+## [0.8.2] - 2026-11-07
+### Added
+- Autopilot background ingestion settings API (`GET` & `POST /api/settings/autopilot`) enabling automated dynamic scheduling and state inspection.
+- Interactive "⚡ Autopilot" toggle button in the dashboard navbar (`frontend/src/app/page.tsx`) with real-time status pulses and tooltips.
+- Automated unit test `test_autopilot_settings_lifecycle` in `backend/tests/test_api.py` (20/20 tests passing).
+
+## [0.8.1] - 2026-11-07
+### Added
+- Multi-criteria topic sorting in backend API (`GET /api/topics?sort_by=...`), supporting ordering by recent updates (`latest`), article volume (`articles`), controversy level (`controversy`), and sentiment extremity (`sentiment`).
+- Interactive sort selector dropdown in the global controls bar of `frontend/src/app/page.tsx`, supporting both online dynamic API sorting and offline IndexedDB client-side sorting.
+- Automated unit test `test_get_topics_multi_criteria_sorting` in `backend/tests/test_api.py` validating sort ordering across all criteria (19/19 tests passing).
+
+## [0.8.0] - 2026-11-07
+### Added
+- Multi-tier bookmark persistence layer synchronizing saved reading list IDs across both IndexedDB (`metrics_store`) and `localStorage` (`omnifeed_bookmarks`).
+- Offline Vault bundle export and restoration now includes saved reading list bookmarks (`omnifeed_offline_vault_*.json`), enabling complete cross-machine bookmark preservation.
+- Extended automated Playwright test suite in `scripts/test_offline_data_access.py` to validate bookmark creation, persistence, and vault restoration.
+
+## [0.7.9] - 2026-11-07
+### Added
+- Concurrent bulk feed health diagnostics and latency probing endpoint `POST /api/sources/ping-all` in `backend/main.py`.
+- Interactive "⚡ Ping All Feeds" button in the Feeds modal in `frontend/src/app/page.tsx` with instant batch health updates and offline local storage caching.
+- Automated backend unit test `test_feed_sources_bulk_health_ping` verifying concurrent health status across all registered sources (18/18 tests passing).
+
+## [0.7.8] - 2026-11-07
+### Added
+- Offline intelligence vault file import (`importOfflineVault`) and restoration button (`📥 Import Vault`) in the Offline Storage Manager modal.
+- Persistent offline feed source health diagnostics and latency metrics stored in `omnifeed_sources_cache` for inspection in disconnected contexts.
+- Extended automated Playwright verification in `scripts/test_offline_data_access.py` testing vault import restoration into IndexedDB.
+
+## [0.7.7] - 2026-11-07
+### Added
+- Offline topic filtering and full-text keyword search directly executed over the IndexedDB persistent cache.
+- Heuristic offline AI bullet briefing synthesis in `handleSummarize()`, allowing immediate cluster summaries when disconnected and saving updates to the local IndexedDB vault.
+- Extended automated Playwright test suite in `scripts/test_offline_data_access.py` validating offline search queries and result rendering.
+
+## [0.7.6] - 2026-11-07
+### Added
+- Multi-action offline synchronization queue supporting `add_feed`, `delete_feed`, and `sync_feeds` actions with optimistic UI feedback.
+- Interactive queue inspection and instant manual queue replay button (`⚡ Replay Queue Now`) in the Offline Storage Manager modal.
+- Extended Playwright automated test suite in `scripts/test_offline_data_access.py` to validate multi-action queue buildup and modal replay buttons.
+
+## [0.7.5] - 2026-11-07
+### Added
+- Native Tauri v2 desktop integration refinement with runtime `get_desktop_info` command handler and dynamic build version logging.
+- Enhanced cross-platform desktop runtime detection in `frontend/src/app/page.tsx` recognizing both `__TAURI__` and `__TAURI_INTERNALS__` objects.
+- Dynamically synchronized Tauri build validation in `scripts/build_offline_distribution.sh` matching single-source `VERSION.md`.
+
 ## [0.7.4] - 2026-11-07
 ### Added
 - Bi-directional WebSocket real-time streaming with immediate telemetry snapshots and topic delta delivery upon client connection handshake (`/api/ws/feed`).

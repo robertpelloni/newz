@@ -61,8 +61,36 @@ class SourcePingResponse(BaseModel):
     latency_ms: float
     http_code: Optional[int] = None
 
+class OPMLImportItem(BaseModel):
+    name: str
+    url: str
+    type: str = "rss"
+    status: str  # "created", "existing", "failed"
+
+class OPMLImportResponse(BaseModel):
+    imported_count: int
+    existing_count: int
+    total_found: int
+    sources: List[OPMLImportItem]
+
+class SourceHealthSummaryResponse(BaseModel):
+    total_sources: int
+    healthy_count: int
+    degraded_count: int
+    unreachable_count: int
+    uptime_percentage: float
+    average_latency_ms: float
+    probed_at: datetime
+    sources: List[SourcePingResponse]
+
 class TopicDeepDive(BaseModel):
     topic: TopicResponse
     articles: List[ArticleResponse]
     discussions: List[DiscussionResponse]
     sentiments: List[SentimentResponse]
+
+class TopicDeltaResponse(BaseModel):
+    server_time: datetime
+    since: Optional[datetime] = None
+    topics_count: int
+    topics: List[Dict[str, Any]]

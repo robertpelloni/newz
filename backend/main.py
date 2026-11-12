@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import Response, JSONResponse
 from sqlalchemy.orm import Session
-from typing import Optional, List, Set
+from typing import Optional, List, Set, Dict, Any
+from datetime import datetime, timezone
 import os
 import signal
 import sys
@@ -267,18 +268,11 @@ def delete_source(source_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success", "message": f"Source {source_id} removed successfully."}
 
-@app.post("/api/sources/{source_id}/ping", response_model=schemas.SourcePingResponse)
-def ping_source(source_id: int, db: Session = Depends(get_db)):
-    """Probe feed source health and measure response latency."""
+def probe_single_source(source: models.Source) -> dict:
     import time
     import urllib.request
-    source = db.query(models.Source).filter(models.Source.id == source_id).first()
-    if not source:
-        raise HTTPException(status_code=404, detail="Feed source not found.")
-
     start_time = time.time()
     try:
-        # Check endpoint latency with short timeout
         req = urllib.request.Request(
             source.url,
             headers={"User-Agent": "Omnifeed-HealthCheck/1.0"}
@@ -294,7 +288,7 @@ def ping_source(source_id: int, db: Session = Depends(get_db)):
                 "latency_ms": round(latency, 1),
                 "http_code": status_code
             }
-    except Exception as e:
+    except Exception:
         latency = (time.time() - start_time) * 1000.0
         return {
             "id": source.id,
@@ -305,32 +299,351 @@ def ping_source(source_id: int, db: Session = Depends(get_db)):
             "http_code": None
         }
 
+@app.post("/api/sources/{source_id}/ping", response_model=schemas.SourcePingResponse)
+def ping_source(source_id: int, db: Session = Depends(get_db)):
+    """Probe feed source health and measure response latency."""
+    source = db.query(models.Source).filter(models.Source.id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Feed source not found.")
+    return probe_single_source(source)
+
+@app.post("/api/sources/ping-all", response_model=list[schemas.SourcePingResponse])
+def ping_all_sources(db: Session = Depends(get_db)):
+    """Probe health and measure response latency across all registered feed sources concurrently."""
+    import concurrent.futures
+    sources = db.query(models.Source).all()
+    if not sources:
+        return []
+
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sources), 8)) as executor:
+        future_to_source = {executor.submit(probe_single_source, s): s for s in sources}
+        for future in concurrent.futures.as_completed(future_to_source):
+            try:
+                results.append(future.result())
+            except Exception:
+                s = future_to_source[future]
+                results.append({
+                    "id": s.id,
+                    "name": s.name,
+                    "url": s.url,
+                    "status": "unreachable",
+                    "latency_ms": 0.0,
+                    "http_code": None
+                })
+    return sorted(results, key=lambda x: x["id"])
+
+@app.get("/api/sources/health-summary", response_model=schemas.SourceHealthSummaryResponse)
+def get_sources_health_summary(db: Session = Depends(get_db)):
+    """Aggregate real-time reachability, latency diagnostics, and uptime statistics across all registered feed sources."""
+    import concurrent.futures
+    from datetime import datetime, timezone
+
+    sources = db.query(models.Source).all()
+    if not sources:
+        return {
+            "total_sources": 0,
+            "healthy_count": 0,
+            "degraded_count": 0,
+            "unreachable_count": 0,
+            "uptime_percentage": 100.0,
+            "average_latency_ms": 0.0,
+            "probed_at": datetime.now(timezone.utc),
+            "sources": []
+        }
+
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sources), 8)) as executor:
+        future_to_source = {executor.submit(probe_single_source, s): s for s in sources}
+        for future in concurrent.futures.as_completed(future_to_source):
+            try:
+                results.append(future.result())
+            except Exception:
+                s = future_to_source[future]
+                results.append({
+                    "id": s.id,
+                    "name": s.name,
+                    "url": s.url,
+                    "status": "unreachable",
+                    "latency_ms": 0.0,
+                    "http_code": None
+                })
+
+    sorted_results = sorted(results, key=lambda x: x["id"])
+    healthy_count = sum(1 for r in sorted_results if r["status"] == "healthy")
+    degraded_count = sum(1 for r in sorted_results if r["status"] == "degraded")
+    unreachable_count = sum(1 for r in sorted_results if r["status"] == "unreachable")
+
+    total = len(sorted_results)
+    uptime_pct = round(((healthy_count + (0.5 * degraded_count)) / total) * 100.0, 1) if total > 0 else 100.0
+
+    valid_latencies = [r["latency_ms"] for r in sorted_results if r["latency_ms"] > 0]
+    avg_latency = round(sum(valid_latencies) / len(valid_latencies), 1) if valid_latencies else 0.0
+
+    return {
+        "total_sources": total,
+        "healthy_count": healthy_count,
+        "degraded_count": degraded_count,
+        "unreachable_count": unreachable_count,
+        "uptime_percentage": uptime_pct,
+        "average_latency_ms": avg_latency,
+        "probed_at": datetime.now(timezone.utc),
+        "sources": sorted_results
+    }
+
+
+@app.post("/api/sources/heartbeat", response_model=schemas.SourceHealthSummaryResponse)
+def trigger_sources_heartbeat(db: Session = Depends(get_db)):
+    """Trigger a concurrent health heartbeat probe across all registered feed sources and return fresh diagnostic telemetry."""
+    return get_sources_health_summary(db=db)
+
+
+@app.get("/api/sources/opml")
+def export_sources_opml(db: Session = Depends(get_db)):
+    """Export all registered RSS and Atom feed subscriptions as a standard OPML 2.0 XML document."""
+    import xml.etree.ElementTree as ET
+    from datetime import datetime, timezone
+
+    sources = db.query(models.Source).all()
+
+    opml = ET.Element("opml", version="2.0")
+    head = ET.SubElement(opml, "head")
+    title = ET.SubElement(head, "title")
+    title.text = "OmniFeed Subscriptions"
+    date_created = ET.SubElement(head, "dateCreated")
+    date_created.text = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
+    docs = ET.SubElement(head, "docs")
+    docs.text = "http://opml.org/spec2.opml"
+
+    body = ET.SubElement(opml, "body")
+    outlines_group = ET.SubElement(body, "outline", text="Feeds", title="Feeds")
+
+    for s in sources:
+        outline_attrs = {
+            "text": s.name or "Untitled Feed",
+            "title": s.name or "Untitled Feed",
+            "type": "rss" if s.type in ("rss", "mainstream", "aggregator") else s.type,
+            "xmlUrl": s.url,
+            "htmlUrl": s.url
+        }
+        ET.SubElement(outlines_group, "outline", **outline_attrs)
+
+    xml_declaration = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml_content = xml_declaration + ET.tostring(opml, encoding="utf-8").decode("utf-8")
+    return Response(content=xml_content, media_type="application/xml; charset=utf-8", headers={
+        "Content-Disposition": "attachment; filename=omnifeed-subscriptions.opml"
+    })
+
+
+@app.post("/api/sources/opml", response_model=schemas.OPMLImportResponse)
+async def import_sources_opml(request: Request, db: Session = Depends(get_db)):
+    """Import and register RSS/Atom feed subscriptions from an uploaded OPML document."""
+    import xml.etree.ElementTree as ET
+
+    content_type = request.headers.get("content-type", "")
+    body_bytes = await request.body()
+    xml_str = ""
+
+    if "application/json" in content_type:
+        try:
+            data = json.loads(body_bytes.decode("utf-8"))
+            xml_str = data.get("opml", "") or data.get("xml", "") or data.get("content", "")
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON payload.")
+    else:
+        xml_str = body_bytes.decode("utf-8", errors="replace")
+
+    if not xml_str.strip():
+        raise HTTPException(status_code=400, detail="Empty OPML content provided.")
+
+    try:
+        root = ET.fromstring(xml_str.strip())
+    except ET.ParseError as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse OPML XML: {str(e)}")
+
+    imported_items = []
+    imported_count = 0
+    existing_count = 0
+
+    for outline in root.findall(".//outline"):
+        xml_url = outline.get("xmlUrl") or outline.get("url")
+        if not xml_url:
+            continue
+
+        xml_url = xml_url.strip()
+        feed_name = outline.get("title") or outline.get("text") or outline.get("name") or xml_url
+        feed_type = outline.get("type", "rss").strip().lower()
+        if feed_type not in ["rss", "atom", "mainstream", "aggregator", "social"]:
+            feed_type = "rss"
+
+        existing = db.query(models.Source).filter(models.Source.url == xml_url).first()
+        if existing:
+            existing_count += 1
+            imported_items.append({
+                "name": existing.name,
+                "url": existing.url,
+                "type": existing.type,
+                "status": "existing"
+            })
+        else:
+            try:
+                new_s = models.Source(
+                    name=feed_name.strip(),
+                    type=feed_type,
+                    url=xml_url
+                )
+                db.add(new_s)
+                db.commit()
+                db.refresh(new_s)
+                imported_count += 1
+                imported_items.append({
+                    "name": new_s.name,
+                    "url": new_s.url,
+                    "type": new_s.type,
+                    "status": "created"
+                })
+            except Exception:
+                db.rollback()
+                imported_items.append({
+                    "name": feed_name.strip(),
+                    "url": xml_url,
+                    "type": feed_type,
+                    "status": "failed"
+                })
+
+    return {
+        "imported_count": imported_count,
+        "existing_count": existing_count,
+        "total_found": len(imported_items),
+        "sources": imported_items
+    }
+
+
+@app.get("/api/topics/delta", response_model=schemas.TopicDeltaResponse)
+def get_topics_delta(
+    since: Optional[str] = Query(None, description="ISO 8601 timestamp to retrieve topics updated strictly after"),
+    category: Optional[str] = Query(None, description="Optional category filter (e.g. Technology, Politics)"),
+    include_details: bool = Query(False, description="Whether to include full narrative timeline and article metadata for immediate offline caching"),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db)
+):
+    """Retrieve incremental topic updates modified or created after a specified timestamp for low-bandwidth delta syncing."""
+    from datetime import datetime, timezone
+
+    since_dt = None
+    if since:
+        try:
+            # Handle potential trailing Z or ISO formats
+            clean_since = since.replace("Z", "+00:00")
+            since_dt = datetime.fromisoformat(clean_since)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid ISO timestamp format for 'since'. Expected format: YYYY-MM-DDTHH:MM:SSZ")
+
+    query = db.query(models.Topic)
+    if since_dt:
+        query = query.filter(models.Topic.last_updated > since_dt)
+    if category and category.lower() != "all":
+        query = query.filter(models.Topic.category.ilike(category))
+
+    topics = query.order_by(models.Topic.last_updated.desc()).limit(limit).all()
+
+    results = []
+    for t in topics:
+        article_topics = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).all()
+        article_count = len(article_topics)
+        latest_sentiment = db.query(models.Sentiment).filter(models.Sentiment.topic_id == t.id).order_by(models.Sentiment.id.desc()).first()
+        controversy_score = 0.0
+        sentiment_score = 0.0
+        if latest_sentiment and latest_sentiment.breakdown_json:
+            controversy_score = latest_sentiment.breakdown_json.get("controversy", 0.0)
+            sentiment_score = latest_sentiment.overall_score or 0.0
+
+        topic_entry: Dict[str, Any] = {
+            "id": t.id,
+            "title": t.title,
+            "summary": t.summary,
+            "category": t.category,
+            "first_seen": t.first_seen.isoformat() if t.first_seen else None,
+            "last_updated": t.last_updated.isoformat() if t.last_updated else None,
+            "article_count": article_count,
+            "controversy_score": round(controversy_score, 2),
+            "sentiment_score": round(sentiment_score, 2),
+            "is_breaking": (controversy_score >= 0.4 or article_count >= 15),
+        }
+
+        if include_details:
+            # Embed correlated articles, timeline events, and entity markers
+            article_ids = [at.article_id for at in article_topics]
+            articles = db.query(models.Article).filter(models.Article.id.in_(article_ids)).all() if article_ids else []
+            articles_payload = [
+                {
+                    "id": a.id,
+                    "title": a.title,
+                    "url": a.url,
+                    "published_at": a.published_at.isoformat() if a.published_at else None,
+                    "excerpt": (a.raw_content[:250] + "...") if a.raw_content and len(a.raw_content) > 250 else (a.raw_content or ""),
+                }
+                for a in articles[:10]
+            ]
+            topic_entry["detail"] = {
+                "id": t.id,
+                "title": t.title,
+                "summary": t.summary,
+                "category": t.category,
+                "first_seen": t.first_seen.isoformat() if t.first_seen else None,
+                "last_updated": t.last_updated.isoformat() if t.last_updated else None,
+                "timeline": t.timeline_json or [],
+                "entities": t.entities_json or [],
+                "articles": articles_payload,
+                "sentiments": [
+                    {
+                        "overall_score": latest_sentiment.overall_score,
+                        "breakdown_json": latest_sentiment.breakdown_json,
+                    }
+                ] if latest_sentiment else [],
+            }
+
+        results.append(topic_entry)
+
+    return {
+        "server_time": datetime.now(timezone.utc),
+        "since": since_dt,
+        "topics_count": len(results),
+        "topics": results
+    }
+
 @app.get("/api/topics")
 def get_topics(
     page: int = Query(1, ge=1),
     page_size: int = Query(12, ge=1, le=100),
     category: Optional[str] = None,
     q: Optional[str] = None,
+    sort_by: str = Query("latest", pattern="^(latest|articles|controversy|sentiment)$"),
     db: Session = Depends(get_db)
 ):
-    """Retrieve paginated topics with search and category filtering."""
+    """Retrieve paginated topics with search, category filtering, and multi-criteria sorting."""
     query = db.query(models.Topic)
     if category and category.lower() != "all":
         query = query.filter(models.Topic.category.ilike(f"%{category}%"))
     if q:
-        query = query.filter(models.Topic.title.ilike(f"%{q}%") | models.Topic.summary.ilike(f"%{q}%"))
+        search_term = f"%{q.strip()}%"
+        # Join correlated articles to enable deep textual search across full source reports
+        query = query.outerjoin(models.ArticleTopic, models.Topic.id == models.ArticleTopic.topic_id)\
+                     .outerjoin(models.Article, models.ArticleTopic.article_id == models.Article.id)\
+                     .filter(
+                         models.Topic.title.ilike(search_term) |
+                         models.Topic.summary.ilike(search_term) |
+                         models.Article.title.ilike(search_term) |
+                         models.Article.raw_content.ilike(search_term)
+                     ).distinct()
 
     total = query.count()
-    skip = (page - 1) * page_size
-    topics = query.order_by(models.Topic.last_updated.desc()).offset(skip).limit(page_size).all()
+    topics = query.all()
 
-    total_pages = max(1, (total + page_size - 1) // page_size)
-
-    # Eagerly prepare response
+    # Pre-build topic items with article count and sentiment attributes for accurate multi-criteria sorting
     items = []
     for t in topics:
         article_count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
-        # Query latest sentiment score/controversy
         latest_sentiment = db.query(models.Sentiment).filter(models.Sentiment.topic_id == t.id).order_by(models.Sentiment.id.desc()).first()
         controversy_score = 0.0
         sentiment_score = 0.0
@@ -351,12 +664,27 @@ def get_topics(
             "is_breaking": (controversy_score >= 0.4 or article_count >= 15),
         })
 
+    # Sort items according to requested sort_by criterion
+    if sort_by == "articles":
+        items.sort(key=lambda x: (x["article_count"], x["last_updated"] or ""), reverse=True)
+    elif sort_by == "controversy":
+        items.sort(key=lambda x: (x["controversy_score"], x["article_count"]), reverse=True)
+    elif sort_by == "sentiment":
+        items.sort(key=lambda x: abs(x["sentiment_score"]), reverse=True)
+    else:  # "latest" default
+        items.sort(key=lambda x: x["last_updated"] or "", reverse=True)
+
+    skip = (page - 1) * page_size
+    paginated_items = items[skip:skip + page_size]
+    total_pages = max(1, (total + page_size - 1) // page_size)
+
     return {
-        "items": items,
+        "items": paginated_items,
         "total": total,
         "page": page,
         "page_size": page_size,
-        "total_pages": total_pages
+        "total_pages": total_pages,
+        "sort_by": sort_by
     }
 
 @app.get("/api/topics/export")
@@ -364,32 +692,82 @@ def export_topics(
     format: str = Query("json", pattern="^(json|csv)$"),
     category: Optional[str] = None,
     q: Optional[str] = None,
+    include_articles: bool = Query(False, description="Include correlated source article citations and excerpts in export"),
+    sort_by: str = Query("latest", pattern="^(latest|articles|controversy|sentiment)$"),
     db: Session = Depends(get_db)
 ):
-    """Export clustered intelligence topics to CSV or JSON formats for analysis."""
+    """Export filtered topics to CSV or JSON formats with optional correlated article excerpts for offline intelligence briefs and reporting."""
     query = db.query(models.Topic)
     if category and category.lower() != "all":
         query = query.filter(models.Topic.category.ilike(f"%{category}%"))
     if q:
-        query = query.filter(models.Topic.title.ilike(f"%{q}%") | models.Topic.summary.ilike(f"%{q}%"))
+        search_term = f"%{q.strip()}%"
+        query = query.outerjoin(models.ArticleTopic, models.Topic.id == models.ArticleTopic.topic_id)\
+                     .outerjoin(models.Article, models.ArticleTopic.article_id == models.Article.id)\
+                     .filter(
+                         models.Topic.title.ilike(search_term) |
+                         models.Topic.summary.ilike(search_term) |
+                         models.Article.title.ilike(search_term) |
+                         models.Article.raw_content.ilike(search_term)
+                     ).distinct()
 
-    topics = query.order_by(models.Topic.last_updated.desc()).all()
+    topics = query.all()
     data = []
     for t in topics:
-        article_count = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).count()
-        data.append({
+        article_links = db.query(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).all()
+        article_count = len(article_links)
+        latest_sentiment = db.query(models.Sentiment).filter(models.Sentiment.topic_id == t.id).order_by(models.Sentiment.id.desc()).first()
+        controversy_score = 0.0
+        sentiment_score = 0.0
+        if latest_sentiment and latest_sentiment.breakdown_json:
+            controversy_score = latest_sentiment.breakdown_json.get("controversy", 0.0)
+            sentiment_score = latest_sentiment.overall_score or 0.0
+
+        item = {
             "id": t.id,
             "title": t.title,
             "category": t.category or "General",
             "article_count": article_count,
             "summary": t.summary or "",
+            "controversy_score": round(controversy_score, 2),
+            "sentiment_score": round(sentiment_score, 2),
             "first_seen": t.first_seen.isoformat() if t.first_seen else "",
             "last_updated": t.last_updated.isoformat() if t.last_updated else ""
-        })
+        }
+
+        if include_articles:
+            articles = db.query(models.Article).join(models.ArticleTopic).filter(models.ArticleTopic.topic_id == t.id).limit(10).all()
+            item["articles"] = [
+                {
+                    "id": a.id,
+                    "title": a.title,
+                    "url": a.url,
+                    "published_at": a.published_at.isoformat() if a.published_at else "",
+                    "excerpt": (a.raw_content[:200] + "...") if a.raw_content and len(a.raw_content) > 200 else (a.raw_content or "")
+                }
+                for a in articles
+            ]
+            if format == "csv":
+                item["article_citations"] = "; ".join([f"{a.title} ({a.url})" for a in articles])
+
+        data.append(item)
+
+    # Sort exported records matching sort_by criterion
+    if sort_by == "articles":
+        data.sort(key=lambda x: (x["article_count"], x["last_updated"]), reverse=True)
+    elif sort_by == "controversy":
+        data.sort(key=lambda x: (x["controversy_score"], x["article_count"]), reverse=True)
+    elif sort_by == "sentiment":
+        data.sort(key=lambda x: abs(x["sentiment_score"]), reverse=True)
+    else:  # "latest" default
+        data.sort(key=lambda x: x["last_updated"], reverse=True)
 
     if format == "csv":
         output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=["id", "title", "category", "article_count", "summary", "first_seen", "last_updated"])
+        fieldnames = ["id", "title", "category", "article_count", "controversy_score", "sentiment_score", "summary", "first_seen", "last_updated"]
+        if include_articles:
+            fieldnames.append("article_citations")
+        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(data)
         csv_content = output.getvalue()
@@ -425,8 +803,48 @@ def summarize_topic(topic_id: int, db: Session = Depends(get_db)):
         "summary": topic.summary
     }
 
+@app.get("/api/topics/{topic_id}/entities")
+def get_topic_entity_matrix(topic_id: int, db: Session = Depends(get_db)):
+    """Extract entity co-occurrence frequency and article citation linkages."""
+    topic = db.query(models.Topic).filter(models.Topic.id == topic_id).first()
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    articles = db.query(models.Article).join(models.ArticleTopic).filter(models.ArticleTopic.topic_id == topic_id).all()
+    entities = list(topic.entities_json or [])
+
+    matrix = []
+    for ent in entities:
+        ent_lower = ent.lower()
+        citing_articles = []
+        for a in articles:
+            text = f"{a.title} {a.raw_content or ''}".lower()
+            if ent_lower in text:
+                citing_articles.append({
+                    "id": a.id,
+                    "title": a.title,
+                    "source": a.source.name if a.source else "News Feed"
+                })
+        matrix.append({
+            "entity": ent,
+            "mention_count": len(citing_articles),
+            "citations": citing_articles
+        })
+
+    matrix.sort(key=lambda x: x["mention_count"], reverse=True)
+    return {
+        "topic_id": topic_id,
+        "total_entities": len(entities),
+        "entities": matrix
+    }
+
 @app.get("/api/topics/{topic_id}")
-def get_topic(topic_id: int, db: Session = Depends(get_db)):
+def get_topic(
+    topic_id: int,
+    timeline_order: str = Query("asc", pattern="^(asc|desc)$"),
+    min_polarity: float = Query(0.0, ge=0.0, le=1.0),
+    db: Session = Depends(get_db)
+):
     topic = db.query(models.Topic).filter(models.Topic.id == topic_id).first()
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
@@ -434,6 +852,13 @@ def get_topic(topic_id: int, db: Session = Depends(get_db)):
     articles = db.query(models.Article).join(models.ArticleTopic).filter(models.ArticleTopic.topic_id == topic_id).all()
     discussions = db.query(models.Discussion).filter(models.Discussion.topic_id == topic_id).all()
     sentiments = db.query(models.Sentiment).filter(models.Sentiment.topic_id == topic_id).all()
+
+    # Process and filter timeline milestones according to order and polarity threshold
+    timeline = list(topic.timeline_json or [])
+    if min_polarity > 0.0:
+        timeline = [e for e in timeline if abs(e.get("polarity", 0.0)) >= min_polarity]
+
+    timeline.sort(key=lambda x: x.get("timestamp", ""), reverse=(timeline_order == "desc"))
 
     return {
         "topic": {
@@ -444,7 +869,7 @@ def get_topic(topic_id: int, db: Session = Depends(get_db)):
             "first_seen": topic.first_seen.isoformat() if topic.first_seen else None,
             "last_updated": topic.last_updated.isoformat() if topic.last_updated else None,
             "entities": topic.entities_json or [],
-            "timeline": topic.timeline_json or [],
+            "timeline": timeline,
         },
         "articles": [
             {
@@ -475,16 +900,21 @@ def get_topic(topic_id: int, db: Session = Depends(get_db)):
     }
 
 @app.get("/api/sentiment/pulse")
-def get_sentiment_pulse(db: Session = Depends(get_db)):
-    """Aggregate pulse and controversy metrics."""
-    sentiments = db.query(models.Sentiment).order_by(models.Sentiment.id.desc()).limit(100).all()
+def get_sentiment_pulse(category: Optional[str] = None, db: Session = Depends(get_db)):
+    """Aggregate pulse and controversy metrics with optional category breakdown."""
+    query = db.query(models.Sentiment)
+    if category and category.lower() != "all":
+        query = query.join(models.Topic).filter(models.Topic.category.ilike(f"%{category}%"))
+
+    sentiments = query.order_by(models.Sentiment.id.desc()).limit(100).all()
     if not sentiments:
         return {
             "overall_sentiment": 0.0,
             "positive_ratio": 0.33,
             "negative_ratio": 0.33,
             "neutral_ratio": 0.34,
-            "sample_size": 0
+            "sample_size": 0,
+            "category": category or "All"
         }
 
     scores = [s.overall_score for s in sentiments if s.overall_score is not None]
@@ -503,7 +933,8 @@ def get_sentiment_pulse(db: Session = Depends(get_db)):
         "positive_ratio": round(pos / total, 2),
         "negative_ratio": round(neg / total, 2),
         "neutral_ratio": round(neu / total, 2),
-        "sample_size": len(scores)
+        "sample_size": len(scores),
+        "category": category or "All"
     }
 
 @app.post("/api/actions/sync")
@@ -543,6 +974,74 @@ async def trigger_firehose(db: Session = Depends(get_db)):
         return {"status": "success", "ingested_events": count, "telemetry": snapshot["counts"]}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+# Autopilot background ingestion state
+autopilot_state = {
+    "enabled": False,
+    "interval_seconds": 60,
+    "last_run": None,
+    "run_count": 0
+}
+
+@app.get("/api/settings/autopilot")
+def get_autopilot_status():
+    """Query current autopilot automated ingestion status."""
+    return autopilot_state
+
+@app.post("/api/settings/autopilot")
+async def set_autopilot_status(payload: dict):
+    """Enable or disable periodic background ingestion."""
+    if "enabled" in payload:
+        autopilot_state["enabled"] = bool(payload["enabled"])
+    if "interval_seconds" in payload and isinstance(payload["interval_seconds"], (int, float)):
+        autopilot_state["interval_seconds"] = max(10, int(payload["interval_seconds"]))
+    return {"status": "success", "autopilot": autopilot_state}
+
+@app.post("/api/sync/pipeline")
+async def run_orchestrated_sync_pipeline(db: Session = Depends(get_db)):
+    """
+    Executes an orchestrated end-to-end ingestion and clustering cycle:
+    1. Multi-source ingestion & clustering
+    2. Concurrent feed health diagnostics & latency heartbeat probing
+    3. Live telemetry snapshotting and autopilot cycle counters
+    4. Real-time WebSocket event broadcast
+    """
+    try:
+        from worker.tasks import run_pipeline_standalone
+        pipeline_res = run_pipeline_standalone()
+
+        # Probe feed health
+        health_summary = get_sources_health_summary(db)
+
+        # Refresh snapshot
+        snapshot = get_live_telemetry_snapshot(db)
+
+        # Update autopilot cycle
+        now_iso = datetime.now(timezone.utc).isoformat()
+        autopilot_state["last_run"] = now_iso
+        autopilot_state["run_count"] += 1
+
+        # Broadcast WebSocket event
+        await manager.broadcast({
+            "event": "pipeline_completed",
+            "cycle": autopilot_state["run_count"],
+            "timestamp": now_iso,
+            "pipeline": pipeline_res,
+            "health": health_summary,
+            "telemetry": snapshot["counts"],
+            "overall_sentiment": snapshot["overall_sentiment"],
+            "recent_topics": snapshot["recent_topics"]
+        })
+
+        return {
+            "status": "success",
+            "pipeline": pipeline_res,
+            "health": health_summary,
+            "telemetry": snapshot["counts"],
+            "autopilot": autopilot_state
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/system/shutdown")
 def shutdown_system():

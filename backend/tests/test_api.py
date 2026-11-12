@@ -215,3 +215,292 @@ def test_websocket_immediate_snapshot_and_request_action():
         assert "telemetry" in reply
         assert "recent_topics" in reply
         assert "overall_sentiment" in reply
+
+def test_feed_sources_bulk_health_ping():
+    res = client.post("/api/sources/ping-all")
+    assert res.status_code == 200
+    items = res.json()
+    assert isinstance(items, list)
+    assert len(items) > 0
+    for s in items:
+        assert "id" in s
+        assert "status" in s
+        assert "latency_ms" in s
+        assert s["status"] in ["healthy", "degraded", "unreachable"]
+
+def test_get_topics_multi_criteria_sorting():
+    for sort_param in ["latest", "articles", "controversy", "sentiment"]:
+        res = client.get(f"/api/topics?sort_by={sort_param}&page_size=5")
+        assert res.status_code == 200
+        data = res.json()
+        assert "items" in data
+        assert "sort_by" in data
+        assert data["sort_by"] == sort_param
+        items = data["items"]
+        if len(items) >= 2:
+            if sort_param == "articles":
+                assert items[0]["article_count"] >= items[1]["article_count"]
+            elif sort_param == "controversy":
+                assert items[0]["controversy_score"] >= items[1]["controversy_score"]
+
+def test_autopilot_settings_lifecycle():
+    # 1. Get current status
+    res = client.get("/api/settings/autopilot")
+    assert res.status_code == 200
+    state = res.json()
+    assert "enabled" in state
+    assert "interval_seconds" in state
+
+    # 2. Toggle enabled to True
+    post_res = client.post("/api/settings/autopilot", json={"enabled": True, "interval_seconds": 45})
+    assert post_res.status_code == 200
+    updated = post_res.json()["autopilot"]
+    assert updated["enabled"] is True
+    assert updated["interval_seconds"] == 45
+
+    # 3. Toggle back to False
+    reset_res = client.post("/api/settings/autopilot", json={"enabled": False})
+    assert reset_res.status_code == 200
+    assert reset_res.json()["autopilot"]["enabled"] is False
+
+def test_topic_detail_timeline_ordering_and_filtering():
+    # Fetch first available topic
+    topics_res = client.get("/api/topics?page_size=1")
+    assert topics_res.status_code == 200
+    items = topics_res.json()["items"]
+    if len(items) > 0:
+        topic_id = items[0]["id"]
+        # Query with desc ordering
+        res_desc = client.get(f"/api/topics/{topic_id}?timeline_order=desc")
+        assert res_desc.status_code == 200
+        tl_desc = res_desc.json()["topic"]["timeline"]
+        if len(tl_desc) >= 2:
+            assert tl_desc[0]["timestamp"] >= tl_desc[1]["timestamp"]
+
+        # Query with asc ordering
+        res_asc = client.get(f"/api/topics/{topic_id}?timeline_order=asc")
+        assert res_asc.status_code == 200
+        tl_asc = res_asc.json()["topic"]["timeline"]
+        if len(tl_asc) >= 2:
+            assert tl_asc[0]["timestamp"] <= tl_asc[1]["timestamp"]
+
+def test_topic_detail_entity_matrix_endpoint():
+    topics_res = client.get("/api/topics?page_size=1")
+    assert topics_res.status_code == 200
+    items = topics_res.json()["items"]
+    if len(items) > 0:
+        topic_id = items[0]["id"]
+        res = client.get(f"/api/topics/{topic_id}/entities")
+        assert res.status_code == 200
+        data = res.json()
+        assert "topic_id" in data
+        assert "total_entities" in data
+        assert "entities" in data
+        assert isinstance(data["entities"], list)
+        for ent in data["entities"]:
+            assert "entity" in ent
+            assert "mention_count" in ent
+            assert "citations" in ent
+
+def test_sentiment_pulse_category_filter():
+    # 1. Query pulse overall
+    res_all = client.get("/api/sentiment/pulse")
+    assert res_all.status_code == 200
+    data_all = res_all.json()
+    assert "overall_sentiment" in data_all
+    assert "category" in data_all
+    assert data_all["category"] == "All"
+
+    # 2. Query pulse scoped to Technology
+    res_tech = client.get("/api/sentiment/pulse?category=Technology")
+    assert res_tech.status_code == 200
+    data_tech = res_tech.json()
+    assert "overall_sentiment" in data_tech
+    assert data_tech["category"] == "Technology"
+    assert "positive_ratio" in data_tech
+    assert "negative_ratio" in data_tech
+
+def test_export_topics_with_sorting():
+    # 1. JSON export with sort_by=articles
+    res_json = client.get("/api/topics/export?format=json&sort_by=articles")
+    assert res_json.status_code == 200
+    items = res_json.json()
+    assert isinstance(items, list)
+    if len(items) >= 2:
+        assert items[0]["article_count"] >= items[1]["article_count"]
+
+    # 2. CSV export with sort_by=controversy
+    res_csv = client.get("/api/topics/export?format=csv&sort_by=controversy")
+    assert res_csv.status_code == 200
+    assert "text/csv" in res_csv.headers["content-type"]
+    assert "controversy_score" in res_csv.text
+
+def test_sources_opml_export_and_import():
+    import uuid
+    # 1. Test OPML export
+    res_export = client.get("/api/sources/opml")
+    assert res_export.status_code == 200
+    assert "application/xml" in res_export.headers["content-type"]
+    assert "<opml version=\"2.0\">" in res_export.text
+    assert "<outline" in res_export.text
+
+    # 2. Test OPML import with distinct URLs
+    uid = uuid.uuid4().hex[:8]
+    url1 = f"https://example.com/tech-radar-{uid}.xml"
+    url2 = f"https://example.com/ai-pulse-{uid}.xml"
+
+    sample_opml = f"""<?xml version="1.0" encoding="UTF-8"?>
+    <opml version="2.0">
+      <head>
+        <title>Test OPML Subscriptions</title>
+      </head>
+      <body>
+        <outline text="Tech Feeds" title="Tech Feeds">
+          <outline text="Test Tech Radar" title="Test Tech Radar" type="rss" xmlUrl="{url1}" htmlUrl="https://example.com" />
+          <outline text="Test AI Pulse" title="Test AI Pulse" type="rss" xmlUrl="{url2}" htmlUrl="https://example.com" />
+        </outline>
+      </body>
+    </opml>"""
+
+    res_import = client.post(
+        "/api/sources/opml",
+        headers={"Content-Type": "application/xml"},
+        content=sample_opml
+    )
+    assert res_import.status_code == 200
+    data = res_import.json()
+    assert data["total_found"] == 2
+    assert data["imported_count"] == 2
+    assert data["existing_count"] == 0
+
+    # 3. Test re-importing same feeds (should mark existing)
+    res_reimport = client.post(
+        "/api/sources/opml",
+        headers={"Content-Type": "application/xml"},
+        content=sample_opml
+    )
+    assert res_reimport.status_code == 200
+    re_data = res_reimport.json()
+    assert re_data["total_found"] == 2
+    assert re_data["existing_count"] == 2
+    assert re_data["imported_count"] == 0
+
+def test_topics_incremental_delta_sync():
+    # 1. Delta sync without since timestamp (returns recent batch)
+    res = client.get("/api/topics/delta?limit=10")
+    assert res.status_code == 200
+    data = res.json()
+    assert "server_time" in data
+    assert "topics_count" in data
+    assert "topics" in data
+    assert isinstance(data["topics"], list)
+    assert data["topics_count"] == len(data["topics"])
+
+    # 2. Delta sync with an ancient timestamp (should return all recent)
+    res_ancient = client.get("/api/topics/delta?since=2000-01-01T00:00:00Z&limit=10")
+    assert res_ancient.status_code == 200
+    data_ancient = res_ancient.json()
+    assert data_ancient["topics_count"] >= 0
+
+    # 3. Delta sync with future timestamp (should return 0 topics)
+    res_future = client.get("/api/topics/delta?since=2099-01-01T00:00:00Z")
+    assert res_future.status_code == 200
+    data_future = res_future.json()
+    assert data_future["topics_count"] == 0
+    assert len(data_future["topics"]) == 0
+
+    # 4. Delta sync with invalid timestamp should return HTTP 400
+    res_invalid = client.get("/api/topics/delta?since=not-a-timestamp")
+    assert res_invalid.status_code == 400
+    assert "Invalid ISO timestamp format" in res_invalid.json()["detail"]
+
+    # 5. Delta sync with include_details=true embeds full detail payload
+    res_details = client.get("/api/topics/delta?limit=5&include_details=true")
+    assert res_details.status_code == 200
+    data_details = res_details.json()
+    if data_details["topics_count"] > 0:
+        first_topic = data_details["topics"][0]
+        assert "detail" in first_topic
+        assert "articles" in first_topic["detail"]
+        assert "timeline" in first_topic["detail"]
+
+    # 6. Delta sync with category filter
+    res_cat = client.get("/api/topics/delta?category=Technology&limit=10")
+    assert res_cat.status_code == 200
+    for t in res_cat.json()["topics"]:
+        assert t["category"].lower() == "technology"
+
+def test_sources_health_summary_endpoint():
+    res = client.get("/api/sources/health-summary")
+    assert res.status_code == 200
+    data = res.json()
+    assert "total_sources" in data
+    assert "healthy_count" in data
+    assert "degraded_count" in data
+    assert "unreachable_count" in data
+    assert "uptime_percentage" in data
+    assert "average_latency_ms" in data
+    assert "probed_at" in data
+    assert "sources" in data
+    assert isinstance(data["sources"], list)
+    assert data["total_sources"] == len(data["sources"])
+    assert 0.0 <= data["uptime_percentage"] <= 100.0
+    assert data["average_latency_ms"] >= 0.0
+
+def test_topics_search_across_correlated_articles():
+    # Query with a keyword common across news articles (e.g. 'Timeline' or 'deployments')
+    res = client.get("/api/topics?q=deployments")
+    assert res.status_code == 200
+    data = res.json()
+    assert "items" in data
+    assert isinstance(data["items"], list)
+    # Validate no duplicate topic ids returned from joins
+    ids = [t["id"] for t in data["items"]]
+    assert len(ids) == len(set(ids))
+
+def test_export_topics_with_correlated_articles():
+    # 1. JSON export with include_articles=true
+    res = client.get("/api/topics/export?format=json&include_articles=true")
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data, list)
+    if len(data) > 0:
+        first = data[0]
+        assert "articles" in first
+        assert isinstance(first["articles"], list)
+        if len(first["articles"]) > 0:
+            art = first["articles"][0]
+            assert "title" in art
+            assert "url" in art
+            assert "excerpt" in art
+
+    # 2. CSV export with include_articles=true
+    res_csv = client.get("/api/topics/export?format=csv&include_articles=true")
+    assert res_csv.status_code == 200
+    assert "article_citations" in res_csv.text
+
+def test_sources_heartbeat_trigger():
+    # Trigger heartbeat probe
+    res = client.post("/api/sources/heartbeat")
+    assert res.status_code == 200
+    data = res.json()
+    assert "total_sources" in data
+    assert "healthy_count" in data
+    assert "uptime_percentage" in data
+    assert "average_latency_ms" in data
+    assert "sources" in data
+    assert isinstance(data["sources"], list)
+    assert 0.0 <= data["uptime_percentage"] <= 100.0
+
+def test_orchestrated_sync_pipeline_endpoint():
+    res = client.post("/api/sync/pipeline")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert "pipeline" in data
+    assert "health" in data
+    assert "telemetry" in data
+    assert "autopilot" in data
+    assert isinstance(data["pipeline"], int) or isinstance(data["pipeline"], dict)
+    assert data["autopilot"]["run_count"] >= 1
+    assert data["health"]["total_sources"] >= 0

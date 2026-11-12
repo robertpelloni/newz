@@ -42,5 +42,35 @@
 - [x] Unified PWA and Tauri desktop offline bundle validation (v0.7.2).
 - [x] IndexedDB Intelligence Vault (`omnifeed_offline_db`) and Offline Storage Governance Modal (v0.7.3).
 - [x] Bi-directional WebSocket Telemetry Streaming & Continuous Offline Ingestion Sync (v0.7.4).
+- [x] Native Tauri Desktop Integration & Dynamic Platform Sync (v0.7.5).
+- [x] Multi-Action Offline Queue & Interactive Modal Replay Controls (v0.7.6).
+- [x] Offline IndexedDB Search, Filter & Heuristic AI Synthesis (v0.7.7).
+- [x] Offline Vault Import Restoration & Feed Health Persistence (v0.7.8).
+- [x] Concurrent Bulk Feed Health Probing & Diagnostics Telemetry (v0.7.9).
+- [x] Multi-Tier Bookmark Persistence & Vault Preservation (v0.8.0).
+- [x] Multi-Criteria Topic Sorting & Disconnected Sorting Engine (v0.8.1).
+- [x] Autopilot Background Ingestion Pipeline & Telemetry Controls (v0.8.2).
+- [x] Interactive Narrative Timeline Ordering & Polarity Filters (v0.8.3).
+- [x] Bulk Topic Deep-Dive Pre-Caching & Offline Card Badging (v0.8.4).
+- [x] Topic Narrative Entity Matrix & Cross-Article Citations (v0.8.5).
+- [x] Scoped Sentiment Pulse Radar & Domain-Filtered Polarity (v0.8.6).
+- [x] Sorted Intelligence Reports Export & Polarity Scoring Metrics (v0.8.7).
+- [x] OPML 2.0 Feed Subscription Export & Bulk Import Engine (v0.8.8).
+- [x] IndexedDB Feed Vault & Disconnected Source Resilience (v0.8.9).
+- [x] Custom Bookmark Annotation Notes & Categorization Tags (v0.9.0).
+- [x] Intermittent Connectivity Offline Resiliency & Automated Delta Sync (v0.9.1).
+- [x] Subscribed Feed Health Diagnostics Summary & Channel Monitoring (v0.9.2).
+- [x] Deep Text Search Across Correlated Articles & Bookmark Notes (v0.9.3).
+- [x] Export of Correlated Article Highlights and Excerpts (v0.9.4).
+- [x] Batch Bookmark & Unbookmark Controls for Filtered Clusters (v0.9.5).
+- [x] Dual-Storage Offline Sync Queue in IndexedDB & Vault Backup Preservation (v0.9.6).
+- [x] Keyboard Shortcut Navigation & Accessibility Controls (v0.9.7).
+- [x] Offline Storage Auto-Compaction & Quota Governance (v0.9.8).
+- [x] Periodic Automated Feed Health Heartbeat & Diagnostics (v0.9.9).
+- [x] Production General Availability & Category Domain Hotkeys (v1.0.0).
+- [x] Sync Audit History Logging, Conflict Drawer Inspector & Resilient Queue Reconciliation (v1.0.1).
+- [x] Web Audio Alert Tone Synthesis & Volume Governance (v1.0.2).
+- [x] Intermittent Delta Sync Deep Story Ingestion & Pre-Caching (v1.0.3).
+- [x] Orchestrated Autopilot Ingestion Pipeline & Execution Auditing (v1.0.4).
 - [x] Data flow architecture specification and multi-source pipeline design.
 - [x] Deep architectural component specifications (Ingestion, Enrichment Pipeline, Consolidated Presentation Layer).

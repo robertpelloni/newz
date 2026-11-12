@@ -46,3 +46,33 @@
 - [x] Unified PWA and Tauri desktop offline bundle validation (v0.7.2).
 - [x] Implement IndexedDB offline intelligence vault and Offline Storage Governance modal with JSON vault export and cache purging (v0.7.3).
 - [x] Implement bi-directional WebSocket telemetry snapshots and continuous client-side IndexedDB ingestion syncing (v0.7.4).
+- [x] Refine Tauri native desktop integration with dynamic versioning and multi-runtime detection (v0.7.5).
+- [x] Multi-action offline queue and manual modal replay controls (v0.7.6).
+- [x] Offline IndexedDB client search, filtering, and heuristic AI briefing synthesis (v0.7.7).
+- [x] Offline vault import restoration and persistent feed diagnostics (v0.7.8).
+- [x] Implement concurrent bulk feed health probing endpoint and frontend controls (v0.7.9).
+- [x] Multi-tier bookmark persistence in IndexedDB and offline vault export/import inclusion (v0.8.0).
+- [x] Implement multi-criteria topic sorting in backend and frontend controls (v0.8.1).
+- [x] Implement autopilot background ingestion pipeline and frontend toggle controls (v0.8.2).
+- [x] Interactive narrative timeline chronological ordering and sentiment polarity filtering (v0.8.3).
+- [x] Implement bulk offline deep-dive pre-caching and topic card cached badging (v0.8.4).
+- [x] Topic narrative entity relationship matrix and interactive citation filtering (v0.8.5).
+- [x] Category-scoped sentiment pulse telemetry and dynamic domain filtering (v0.8.6).
+- [x] Multi-criteria topic export sorting and polarity score inclusion (v0.8.7).
+- [x] OPML 2.0 feed subscription export and bulk outline import pipeline (v0.8.8).
+- [x] IndexedDB feed vault and disconnected channel synchronization resilience (v0.8.9).
+- [x] Custom bookmark annotation notes, tag taxonomies, and tag filtering (v0.9.0).
+- [x] Intermittent connectivity delta sync engine, latency telemetry, and partial replay retry (v0.9.1).
+- [x] Feed health diagnostics summary endpoint, uptime calculations, and UI warnings (v0.9.2).
+- [x] Deep text search across correlated source articles and offline bookmark annotation notes (v0.9.3).
+- [x] Export of filtered deep-search results with correlated article excerpts (v0.9.4).
+- [x] Batch bookmark and unbookmark controls for filtered topic clusters (v0.9.5).
+- [x] Dual-storage offline sync queue in IndexedDB and offline vault preservation (v0.9.6).
+- [x] Keyboard shortcut navigation and accessibility controls with visual focus ring and help dialog (v0.9.7).
+- [x] Offline storage auto-compaction and quota governance with visual telemetry progress bar (v0.9.8).
+- [x] Periodic automated feed health heartbeat probe & diagnostics telemetry (v0.9.9).
+- [x] Production General Availability release v1.0.0 and numerical category domain hotkeys (v1.0.0).
+- [x] Offline sync audit history logging, conflict drawer inspector, and resilient queue reconciliation (v1.0.1).
+- [x] Audio alert volume slider, tone profiles (chime, radar, sonar), and live test controls (v1.0.2).
+- [x] Intermittent delta sync deep story ingestion & pre-caching pipeline into IndexedDB (v1.0.3).
+- [x] Orchestrated autopilot ingestion pipeline endpoint (`POST /api/sync/pipeline`), cycle tracking, and sync audit logging (v1.0.4).
