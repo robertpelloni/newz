@@ -1,131 +1,26 @@
 # newz (Omnifeed)
 
-**Multi-source news and sentiment aggregator** — "Google News on steroids": correlate the same story across Google News, Yahoo News, MSN, and Fox; merge in link-aggregator signals (Reddit, Hacker News, Lobsters, Digg, …) matched to those topics; read the articles *and* the comment threads; summarize both with highlights, topics, and sentiment; then layer social-media reaction (Bluesky AT Protocol, Mastodon Fediverse, X/Twitter, Threads, LinkedIn, Facebook, 4chan) on top, presented as a high-density, topic-clustered news front page and unified dashboard.
+A multi-source news and sentiment aggregator: correlate the same story across Google News, Yahoo News, MSN, and Fox; merge in link-aggregator signals (Reddit, Hacker News, Lobsters, Digg) matched to those topics; read the articles and the comment threads; summarize both with highlights, topics, and sentiment; then layer social-media reaction (Bluesky AT Protocol, Mastodon, X/Twitter, Threads, LinkedIn, Facebook, 4chan) on top, presented as a high-density, topic-clustered news front page and unified dashboard.
 
----
+## Status
 
-## 1. Data Flow Architecture & System Diagram
+**Active development (v1.0.4).** Last significant activity: **2026-11-12** — merge of the omnifeed unified-dashboard branch (Protocol #281). Nov 8–11 shipped v1.0.0–v1.0.4: offline sync audit logging, conflict-resilient queue reconciliation, Web Audio alert tones, delta sync deep-story ingestion and caching, and an orchestrated sync pipeline.
 
-The Omnifeed data processing pipeline operates as a real-time reactive ingestion and synthesis loop connecting heterogeneous raw feeds to an ultra-dense intelligence frontend.
+The Nov 8 commit calls v1.0.0 "Production General Availability" — that is the commit's label, not an independently verified deployment. There is no evidence in the repo of a live public deployment.
 
-```
-+----------------------------------------------------------------------------------------------------+
-|                                    1. RAW INGESTION SOURCES                                        |
-|                                                                                                    |
-|  [Mainstream Wires]       [Link Aggregators]         [Social Firehoses]         [Community Boards] |
-|   - Google News RSS        - Reddit (r/news, tech)    - Bluesky AT Protocol      - Hacker News API |
-|   - Yahoo News RSS         - Lobsters JSON            - Mastodon Fediverse       - 4chan JSON      |
-|   - MSN / Fox Wires        - Digg Submissions         - Threads / X firehose                       |
-+----------------------------------------+-----------------------------------------------------------+
-                                         |
-                                         v
-+----------------------------------------------------------------------------------------------------+
-|                               2. NORMALIZATION & TOKEN PRE-PROCESSING                              |
-|                                                                                                    |
-|   - Text Sanitation & HTML Strip       - Token Regex Extraction ([a-zA-Z]{3,})                     |
-|   - Stop-Word Filtering (50+ words)    - Deduplication by Normalized URL / Headline Hash           |
-+----------------------------------------+-----------------------------------------------------------+
-                                         |
-                                         v
-+----------------------------------------------------------------------------------------------------+
-|                            3. CLUSTERING & INTELLIGENCE PIPELINE                                   |
-|                                                                                                    |
-|   - Unsupervised Jaccard Similarity (Threshold >= 0.25 token intersection/union)                   |
-|   - Entity Extraction (Capitalized proper noun n-gram candidate ranking)                           |
-|   - Chronological Narrative Evolution Tracking (Timestamped wire milestones)                       |
-|   - Lexicon Sentiment & Controversy Engine (Positive/Negative polarities + overlap scoring)        |
-|   - Local LLM / Ollama Synthesis (Llama3 prompt bridge + heuristic fallback)                       |
-+----------------------------------------+-----------------------------------------------------------+
-                                         |
-                                         v
-+----------------------------------------------------------------------------------------------------+
-|                                4. PERSISTENCE & STORAGE TIER                                       |
-|                                                                                                    |
-|   - Dual-Engine Architecture:                                                                      |
-|     * Local Zero-Dependency Fallback: SQLite (`sqlite:///./omnifeed.db`)                           |
-|     * Production Distributed: PostgreSQL + pgvector (`DATABASE_URL`)                               |
-|   - Relational Models: Source, Article, Topic, ArticleTopic, Sentiment, Discussion                 |
-+-------------------+---------------------------------------------------+----------------------------+
-                    |                                                   |
-                    v (REST APIs)                                       v (Duplex WebSockets)
-+---------------------------------------+   +--------------------------------------------------------+
-|       5. FASTAPI APPLICATION HUB      |   |             6. REAL-TIME EVENT STREAMING               |
-|                                       |   |                                                        |
-|   - GET  /api/topics (Pagination)     |   |   - WS /api/ws/feed                                    |
-|   - GET  /api/topics/{id} (Timeline)  |   |   - ConnectionManager Broadcasting:                    |
-|   - POST /api/topics/{id}/summarize   |   |     * sync_completed (Wire updates)                    |
-|   - POST /api/firehose/simulate       |   |     * firehose_pulse (Social micro-commentary)         |
-|   - GET  /api/sentiment/pulse         |   |                                                        |
-|   - GET  /api/topics/export (CSV/JSON)|   |                                                        |
-+-------------------+-------------------+   +---------------------------+----------------------------+
-                    |                                                   |
-                    +-------------------+-------------------------------+
-                                        |
-                                        v
-+----------------------------------------------------------------------------------------------------+
-|                           7. CONSOLIDATED INTELLIGENCE FRONTEND                                    |
-|                                                                                                    |
-|   - Next.js 15 & Tailwind CSS v4 Single-Page Operations Dashboard                                  |
-|   - Top Telemetry Bar (Total Articles, Active Topics, Discussions, Global Polarity Pulse)          |
-|   - Real-Time Search & Categorical Filtering (General, Tech, Business, Politics, Science, Entert.) |
-|   - Dual-Direction Server Pagination (Top & Bottom pagination controls)                            |
-|   - Interactive Topic Cluster Deep-Dive Modal:                                                     |
-|     * Correlated multi-source wire headlines & external links                                      |
-|     * Extracted named entity badges                                                                |
-|     * Chronological narrative evolution timeline nodes                                             |
-|     * Synthesized intelligence summary card with local LLM refresh button                          |
-|   - Operational Controls: Stream Firehose, Sync Ingestion, Export CSV/JSON, OLED Contrast, Shutdown|
-|   - Cross-Platform Distribution:                                                                   |
-|     * Desktop Shell: Tauri v2 Wrapper (`frontend/src-tauri`)                                       |
-|     * PWA: Offline service worker caching (`sw.js`) & Web App Manifest (`manifest.json`)           |
-+----------------------------------------------------------------------------------------------------+
+## Architecture
+
+- **Ingestion** — RSS pollers for mainstream wires (Google News, Yahoo News, MSN, Fox); JSON parsers for link aggregators (Reddit, Hacker News, Lobsters, Digg, 4chan); social firehoses (Bluesky AT Protocol, Mastodon, Threads/X)
+- **Normalization & clustering** — text sanitation, stop-word filtering, dedup by normalized URL/headline hash, Jaccard-similarity topic clustering (threshold ≥ 0.25), entity extraction, lexicon sentiment/controversy scoring, local LLM (Ollama/Llama3) synthesis with heuristic fallback
+- **Persistence** — SQLite locally (`omnifeed.db`); PostgreSQL + pgvector for production (`DATABASE_URL`). Models: Source, Article, Topic, ArticleTopic, Sentiment, Discussion
+- **Backend** (`backend/`) — FastAPI: REST endpoints for topics, timelines, summaries, sentiment pulse, CSV/JSON export; WebSocket feed (`/api/ws/feed`) for live updates
+- **Worker** (`worker/`) — ingestion/sync jobs
+- **Frontend** (`frontend/`) — Next.js 15 + Tailwind CSS v4 single-page dashboard: telemetry bar, search and category filtering, topic-cluster deep-dive modals, firehose/sync/export controls; Tauri v2 desktop wrapper and PWA offline caching
+
+## Running
+
+```bash
+docker-compose up   # see docker-compose.yml and DEPLOY.md
 ```
 
----
-
-## 2. Core Architectural Components
-
-Omnifeed's architectural foundation is partitioned into three foundational subsystems:
-
-### Component 1: Multi-Source Data Ingestion Engine
-- **Mainstream Wires**: High-frequency XML/RSS pollers for Google News, Yahoo News, and MSN News, extracting structured headlines, links, publication timestamps, and snippet contents.
-- **Link Aggregators**: Automated JSON parsers for Reddit (`/r/news`, `/r/technology`), Hacker News Firebase API, and Lobsters capturing submissions, vote velocities, author metadata, and discussion threads.
-- **Real-Time Social Firehoses**: Subscribers for the Bluesky AT Protocol Jetstream and Mastodon Fediverse public timelines (`/api/firehose/simulate`), capturing instant micro-reactions and breaking bulletins.
-- **Sanitization & Token Pre-Processing**: HTML stripping, lowercase regex normalization (`[a-zA-Z]{3,}`), and 50+ stop-word elimination to yield informative semantic token sets.
-
-### Component 2: Processing & Enrichment Pipeline
-- **Unsupervised Topic Clustering**: Token-based Jaccard similarity engine:
-  $$\text{Jaccard}(A, B) = \frac{|A \cap B|}{|A \cup B|}$$
-  Incoming articles with a similarity score $sim \ge 0.25$ automatically cluster into existing topic entities; otherwise, a new dynamic topic cluster is spawned.
-- **Entity Extraction**: Unsupervised proper-noun n-gram parser that extracts high-frequency named entities (persons, organizations, locations) across cluster documents.
-- **Chronological Narrative Evolution**: Each correlated wire or social article generates an event marker containing `headline`, `source`, `source_type`, `polarity`, `url`, and timezone-aware UTC timestamps, sorted in strict chronological sequence.
-- **Lexicon Polarity & Controversy Scoring**: Keyword polarity evaluation coupled with controversy metrics when competing positive/negative signals coincide.
-- **Local LLM Synthesis Bridge**: Integration with local Ollama instances (`llama3`) for on-demand 3-bullet executive synthesis, backed by deterministic multi-source heuristic fallback.
-
-### Component 3: Consolidated Presentation Layer
-- **Unified Single-Screen Operations Hub**: High-density Next.js 15 and Tailwind CSS v4 dashboard consolidating all features without fragmentation.
-- **Duplex WebSocket Event Streaming**: `/api/ws/feed` channel pushing live ingestion notifications and firehose bursts directly to client UI toast alerts.
-- **Topic Deep-Dive Modal**: Interactive inspector displaying correlated source links, entity tags, chronological timeline nodes, and local AI synthesis summaries.
-- **Dual Persistence Architecture**: Zero-dependency automatic SQLite fallback (`sqlite:///./omnifeed.db`) for immediate standalone developer use, with full PostgreSQL + pgvector support for production scale.
-- **Cross-Platform Delivery**: Tauri v2 native desktop application wrapper (`frontend/src-tauri/`) and Progressive Web App with offline caching (`sw.js` and `manifest.json`).
-
----
-
-## 3. Project Structure
-- `/backend`: FastAPI REST API, WebSocket streaming channel, SQLAlchemy ORM models, and database engine with SQLite fallback.
-- `/worker`: Tasks for feed ingestion, unsupervised clustering, sentiment scoring, and local LLM summarization.
-- `/frontend`: Next.js 15 React web dashboard with Tailwind CSS v4, PWA service worker, and Tauri v2 desktop integration (`frontend/src-tauri`).
-- `/scripts`: Standalone lifecycle controller, system tray daemon (`scripts/system_tray.py`), and offline distribution build tool (`scripts/build_offline_distribution.sh`).
-
----
-
-## 4. Offline First & Cross-Platform Execution
-
-Omnifeed is designed from the ground up to operate reliably without continuous internet connectivity:
-
-- **Progressive Web App (PWA):** Equipped with `frontend/public/manifest.json` and `frontend/public/sw.js` (caching buckets `omnifeed-static-v3` and `omnifeed-api-v3`). Uses Stale-While-Revalidate caching for static frontend bundles and a Network-First, Cache-Fallback policy for `/api/` endpoints.
-- **Service Worker Background Sync:** Registers a background synchronization hook (`sync-omnifeed-queue`) to replay pending actions asynchronously via the Service Worker `sync` event handler, with duplex client messaging (`TRIGGER_QUEUE_REPLAY`, `BACKGROUND_SYNC_COMPLETED`).
-- **Client-Side Cache Redundancy:** Topic clusters, feed channel subscriptions, detailed cluster intelligence views, and reading list bookmarks automatically synchronize to browser `localStorage` (`omnifeed_cached_topics`, `omnifeed_sources_cache`, `omnifeed_topic_detail_<id>`, `omnifeed_bookmarks`), rendering feeds and deep-dives instantly even when disconnected.
-- **Offline Sync Queue:** If an ingestion sync is triggered while disconnected, the command is placed in `omnifeed_sync_queue`. The UI dynamically morphs the sync button into `⚡ Queue Sync` with pending count badges, automatically executing and flushing upon network recovery.
-- **Tauri v2 Desktop Native Shell:** Native OS wrapper with tray icon controls, system notification dispatch, and offline capabilities.
-- **Offline Distribution Build:** Run `./scripts/build_offline_distribution.sh` to validate manifest assets, compile production bundles, and verify service worker synchronization rules.
+See `DEPLOY.md` for deployment notes and `HANDOFF.md` for the current state of the work.
